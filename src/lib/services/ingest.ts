@@ -176,3 +176,19 @@ export async function findActiveCallByPhone(db: Db, phone: string, mode: DataMod
     .limit(1);
   return row ?? null;
 }
+
+/**
+ * Last-resort correlation for a tool call that carries neither a call id nor a caller number (Vaani's custom-tool
+ * form does not document passing either): if EXACTLY ONE call is in progress (started in the last 45 minutes, not
+ * ended) it is that call. With two or more in progress the request is refused rather than guessed.
+ */
+export async function findSoleActiveCall(db: Db, mode: DataMode): Promise<{ call: CallRow | null; ambiguous: boolean }> {
+  const since = new Date(Date.now() - 45 * 60_000);
+  const rows = await db
+    .select()
+    .from(calls)
+    .where(and(eq(calls.mode, mode), gte(calls.receivedAt, since), isNull(calls.endedAt)))
+    .orderBy(desc(calls.receivedAt))
+    .limit(3);
+  return rows.length === 1 ? { call: rows[0]!, ambiguous: false } : { call: null, ambiguous: rows.length > 1 };
+}

@@ -66,7 +66,7 @@ console.log(`Vaani custom tools for ${url}` + "\n");
 console.log("Vaani dashboard -> Design -> Tools & Actions -> New Action -> Create Custom Tool. For each tool below fill the form fields exactly:" + "\n");
 for (const t of TOOLS) {
   console.log("=".repeat(78));
-  console.log(`Name *            : ${t.name}`);
+  console.log(`Name *            : aangan_${({ get_call_context: "get_call_context", save_enquiry_progress: "save_progress", evaluate_qualification: "evaluate_lead", get_available_slots: "find_slots", book_consultation: "make_booking", escalate_to_human: "escalate_to_human" } as Record<string, string>)[t.action]}   (names must be unique across Vaani; avoid 'book_consultation')`);
   console.log(`Description *     : ${t.when}`);
   console.log(`API Endpoint *    : POST  ${url}?action=${t.action}`);
   console.log("Timeout (ms)      : 8000");

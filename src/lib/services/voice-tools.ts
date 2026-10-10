@@ -14,7 +14,7 @@ import { sha256Hex } from "../security/hmac";
 import { DEFAULT_TZ, isAfterHours, isoDateInZone, zonedParts } from "../time";
 import { bookConsultation, getAvailableSlots, type SlotsOutcome, type TimeOfDay } from "./booking";
 import { createEscalation } from "./escalations";
-import { currentCallMode, ensureCallContext, findActiveCallByPhone, normalizePhone, type CallContext } from "./ingest";
+import { currentCallMode, ensureCallContext, findActiveCallByPhone, findSoleActiveCall, normalizePhone, type CallContext } from "./ingest";
 import { enqueue } from "./outbox";
 import { evaluateAndPersist, saveFacts } from "./qualify";
 import { getQualificationConfig } from "./settings";
@@ -121,12 +121,21 @@ export async function handleToolRequest(db: Db, rawBody: unknown, meta: ToolRequ
     const active = await findActiveCallByPhone(db, phone, mode);
     if (active) ctx = await ensureCallContext(db, { vaaniCallId: active.vaaniCallId, fromNumber: phone, mode, businessHours: config.businessHours, source: "tool" });
   }
+  let resolvedBy = vaaniCallId ? "call_id" : phone ? "caller_phone" : "none";
+  if (!ctx && !vaaniCallId && !phone) {
+    const sole = await findSoleActiveCall(db, mode);
+    if (sole.call) {
+      ctx = await ensureCallContext(db, { vaaniCallId: sole.call.vaaniCallId, fromNumber: sole.call.fromNumber, mode, businessHours: config.businessHours, source: "tool" });
+      resolvedBy = "sole_active_call";
+      await logCallEvent(db, ctx.call.id, "call_resolved_by_recency", { action });
+    }
+  }
   if (!ctx) {
     // Diagnostics for set-up: record WHICH fields/headers arrived (names only) so the Vaani tool mapping can be corrected.
     await db.insert(integrationEvents).values({
       integration: "vaani", direction: "inbound", eventType: "tool_call_without_call_context", status: "rejected",
       error: "Tool call carried neither call_id nor caller_phone",
-      payload: { action, bodyKeys: Object.keys(data), headerNames: meta.headerNames ?? [] },
+      payload: { action, resolvedBy, bodyKeys: Object.keys(data), headerNames: meta.headerNames ?? [] },
     }).catch(() => undefined);
     return reply(
       { ok: false, status: "missing_call_context", error: { code: "missing_call_context", message: "Provide call_id, or caller_phone for a call that is in progress." } },

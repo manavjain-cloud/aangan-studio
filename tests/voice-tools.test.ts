@@ -151,6 +151,18 @@ describe("guardrails on the live endpoint", () => {
     expect(r.body.status).toBe("missing_call_context");
   });
 
+  it("a tool call with no call id and no number attaches to the ONE call in progress, and is refused when two are in progress", async () => {
+    await h.webhook({ event: "call_started", room_name: "only-one", phone_number: "+919800077701" });
+    const ok = await h.tool("save_enquiry_progress", { caller_name: "No Id" }, "");
+    expect(ok.body.ok).toBe(true);
+    const [c] = await h.db.select().from(calls);
+    expect(c!.vaaniCallId).toBe("only-one");
+    await h.webhook({ event: "call_started", room_name: "second", phone_number: "+919800077702" });
+    const amb = await h.tool("save_enquiry_progress", { caller_name: "Who" }, "");
+    expect(amb.httpStatus).toBe(422);
+    expect(amb.body.status).toBe("missing_call_context");
+  });
+
   it("rejects invalid actions with 400", async () => {
     const r = await h.tool("delete_everything", {});
     expect(r.httpStatus).toBe(400);
