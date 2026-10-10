@@ -346,7 +346,7 @@ describe("call identity when Vaani passes none (call_ref, ad-hoc sessions, sessi
   });
 
   it("a browser/chat test with no call event gets its own closed ad-hoc session, labelled simulated, and works end to end", async () => {
-    const ctx = await hh.tool("get_call_context", { session_mode: "chat" }, "");
+    const ctx = await hh.tool("get_call_context", { call_mode: "chat" }, "");
     const ref = (ctx.body.data as { call_ref: string }).call_ref;
     const [c] = await hh.db.select().from(calls);
     expect(c!.vaaniCallId).toMatch(/^adhoc-/);
@@ -359,14 +359,14 @@ describe("call identity when Vaani passes none (call_ref, ad-hoc sessions, sessi
 
   it("a real phone call (session mode 'phone') is not treated as a test", async () => {
     await hh.webhook({ event: "call_started", data: { call_id: "room-P", room_name: "room-P", phone_number: "+919800000121" } });
-    await hh.tool("get_call_context", { session_mode: "phone" }, "");
+    await hh.tool("get_call_context", { call_mode: "phone" }, "");
     const [c] = await hh.db.select().from(calls);
     expect(c!.vaaniCallId).toBe("room-P");
     expect(c!.callRef).not.toBeNull();
   });
 
   it("the agent sending every parameter with defaults does not corrupt the record or clear a complaint", async () => {
-    const ctx = await hh.tool("get_call_context", { session_mode: "chat" }, "");
+    const ctx = await hh.tool("get_call_context", { call_mode: "chat" }, "");
     const ref = (ctx.body.data as { call_ref: string }).call_ref;
     await hh.tool("escalate_to_human", { call_ref: ref, reason: "complaint", details: "no reply for days" }, "");
     const defaults = { call_ref: ref, caller_name: "", project_type: "", bhk: 0, carpet_area_sqft: 0, is_rented: false, existing_customer_complaint: false, requests_senior: false, budget_inr_max: 0, desired_completion_date: "" };

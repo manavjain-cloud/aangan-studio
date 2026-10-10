@@ -110,7 +110,7 @@ export async function handleToolRequest(db: Db, rawBody: unknown, meta: ToolRequ
     return reply({ ok: false, status: "rate_limited", error: { code: "rate_limited", message: `Too many requests; retry in ${ipLimit.retryAfterSec}s` } }, 429);
   }
 
-  const sessionMode = typeof data.session_mode === "string" ? data.session_mode.trim().slice(0, 40) : "";
+  const sessionMode = typeof data.call_mode === "string" ? data.call_mode.trim().slice(0, 40) : "";
   // Vaani's {{call_mode}} says whether this is a phone call or a browser/chat test. Tests are labelled simulated.
   const isTestSession = /test|chat|web|browser|widget|simulat/i.test(sessionMode);
   const mode = isTestSession ? "mock" : currentCallMode();
@@ -153,7 +153,7 @@ export async function handleToolRequest(db: Db, rawBody: unknown, meta: ToolRequ
     await db.update(calls).set({ endedAt: new Date(), answered: true, answeredAt: new Date() }).where(eq(calls.id, ctx.call.id));
     resolvedBy = "adhoc_session";
   }
-  if (ctx && resolvedBy !== "call_id") await logCallEvent(db, ctx.call.id, "call_resolved", { action, resolvedBy, sessionMode: sessionMode || null });
+  if (ctx && resolvedBy !== "call_id") await logCallEvent(db, ctx.call.id, "call_resolved", { action, resolvedBy, callMode: sessionMode || null });
   if (!ctx) {
     // Diagnostics for set-up: record WHICH fields/headers arrived (names only) so the Vaani tool mapping can be corrected.
     await db.insert(integrationEvents).values({
