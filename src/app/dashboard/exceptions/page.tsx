@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ackEscalationAction, assignEscalationAction, resolveEscalationAction } from "@/app/actions/dashboard";
 import { Filters, buildHref, parseScope } from "@/components/filters";
 import { Empty, ModeBadge, PageHeader, Section, StatusPill } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { resolveRange } from "@/lib/services/analytics";
 import { getExceptions } from "@/lib/services/exceptions";
@@ -26,7 +26,7 @@ const KIND_LABEL: Record<string, string> = {
 };
 
 export default async function ExceptionsPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin();
+  await requireViewer();
   const sp = await searchParams;
   const scope = parseScope(sp.data);
   const range = resolveRange(sp);

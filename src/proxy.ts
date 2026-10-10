@@ -7,6 +7,12 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/security/session";
  * The voice tool and webhook API routes are deliberately NOT matched here; they carry their own authentication.
  */
 export async function proxy(req: NextRequest) {
+  // PUBLIC_DASHBOARD: viewing is open to anyone with the link; every server action still requires an admin session.
+  if (/^(1|true)$/i.test(process.env.PUBLIC_DASHBOARD ?? "")) {
+    const open = NextResponse.next();
+    open.headers.set("Cache-Control", "private, no-store");
+    return open;
+  }
   const session = await verifySessionToken(req.cookies.get(SESSION_COOKIE)?.value, process.env.SESSION_SECRET);
   if (!session) {
     const url = req.nextUrl.clone();

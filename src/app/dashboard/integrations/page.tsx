@@ -1,7 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { HealthChecks } from "@/components/health-checks";
 import { PageHeader, Section, StatusPill } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { integrationEvents } from "@/lib/db/schema";
 import { getEnv, allIntegrationStatuses, type IntegrationName } from "@/lib/env";
@@ -42,7 +42,7 @@ const GUIDE: Record<IntegrationName, { title: string; role: string; vars: string
 };
 
 export default async function IntegrationsPage() {
-  await requireAdmin();
+  await requireViewer();
   const db = await getDb();
   const env = getEnv();
   const statuses = allIntegrationStatuses();

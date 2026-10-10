@@ -1,7 +1,7 @@
 import { asc } from "drizzle-orm";
 import { addFixedCostAction, addTeamMemberAction, removeFixedCostAction, saveCostSettingsAction, savePolicyAction, toggleTeamMemberAction } from "@/app/actions/dashboard";
 import { PageHeader, Section, StatusPill, fmtInr } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { fixedCosts } from "@/lib/db/schema";
 import { CRITERION_KEYS, CRITERION_LABELS } from "@/lib/domain/types";
@@ -13,7 +13,7 @@ export const metadata = { title: "Settings" };
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage({ searchParams }: { searchParams: Promise<{ saved?: string }> }) {
-  await requireAdmin();
+  await requireViewer();
   const { saved } = await searchParams;
   const db = await getDb();
   const env = getEnv();

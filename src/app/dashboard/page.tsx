@@ -2,7 +2,7 @@ import Link from "next/link";
 import { BarList, FunnelChart, TrendChart } from "@/components/charts";
 import { Filters, parseScope } from "@/components/filters";
 import { DispositionBadge, Empty, INTEGRATION_LABELS, ModeBadge, PageHeader, Section, Stat, StatusPill, fmtDuration, fmtInr, fmtMinutes, fmtPct } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { getOverview, resolveRange } from "@/lib/services/analytics";
 import { formatDateTimeInZone } from "@/lib/time";
@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 type SP = { range?: string; from?: string; to?: string; data?: string };
 
 export default async function OverviewPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin();
+  await requireViewer();
   const sp = await searchParams;
   const range = resolveRange(sp);
   const scope = parseScope(sp.data);

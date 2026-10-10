@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { overrideDisposition } from "@/app/actions/dashboard";
 import { DispositionBadge, ModeBadge, PageHeader, Section, StatusPill } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { CRITERION_LABELS, DISPOSITIONS, type CriterionStatus } from "@/lib/domain/types";
 import { getLeadDetail } from "@/lib/services/lead-detail";
@@ -31,7 +31,7 @@ const FACT_LABELS: Record<string, string> = {
 };
 
 export default async function LeadDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const admin = await requireAdmin();
+  const admin = await requireViewer();
   const { id } = await params;
   if (!z.string().uuid().safeParse(id).success) notFound();
   const d = await getLeadDetail(await getDb(), id);

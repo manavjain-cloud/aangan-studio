@@ -30,9 +30,23 @@ export async function getSession(): Promise<AdminSession | null> {
   return row ? { email } : null;
 }
 
-/** Use at the top of every dashboard page and server action. Management only. */
+/** Use at the top of every server action that changes anything. Management only. */
 export async function requireAdmin(): Promise<AdminSession> {
   const s = await getSession();
-  if (!s) redirect("/");
+  if (!s) redirect("/?signin=1");
   return s;
+}
+
+export interface Viewer {
+  email: string;
+  /** True for a signed-in admin; false for a guest allowed in by PUBLIC_DASHBOARD. */
+  isAdmin: boolean;
+}
+
+/** Use at the top of dashboard pages (read-only views). Guests are allowed only when PUBLIC_DASHBOARD is on. */
+export async function requireViewer(): Promise<Viewer> {
+  const s = await getSession();
+  if (s) return { email: s.email, isAdmin: true };
+  if (getEnv().PUBLIC_DASHBOARD) return { email: "Guest (view only)", isAdmin: false };
+  redirect("/");
 }

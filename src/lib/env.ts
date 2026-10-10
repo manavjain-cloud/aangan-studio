@@ -28,6 +28,8 @@ const envSchema = z.object({
 
   FORCE_MOCK_INTEGRATIONS: flag,
   ALLOW_MOCK_IN_PRODUCTION: flag,
+  /** Anyone with the link may VIEW the dashboard (no sign-in); changing anything still needs an admin account. */
+  PUBLIC_DASHBOARD: flag,
 
   VAANI_API_KEY: optional,
   VAANI_BASE_URL: z.string().url().default("https://api.vaanivoice.ai"),

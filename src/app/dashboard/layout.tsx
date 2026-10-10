@@ -1,9 +1,10 @@
 import { sql } from "drizzle-orm";
 import { FlaskConical } from "lucide-react";
+import Link from "next/link";
 import { signOut } from "@/app/actions/auth";
 import { MobileNav, SidebarNav } from "@/components/nav";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { calls } from "@/lib/db/schema";
 
@@ -16,27 +17,32 @@ async function composition() {
   return { live: get("live"), mock: get("mock"), seed: get("seed") };
 }
 
-function Account({ email }: { email: string }) {
+function Account({ email, isAdmin }: { email: string; isAdmin: boolean }) {
   return (
     <div className="flex flex-col gap-3">
       <ThemeToggle className="self-start" />
+      <Link href="/talk" className="text-[13px] underline underline-offset-4">Try the voice call</Link>
       <p className="text-[12px] text-subtle break-all">{email}</p>
-      <form action={signOut}>
-        <button type="submit" className="btn btn-ghost btn-sm">Sign out</button>
-      </form>
+      {isAdmin ? (
+        <form action={signOut}>
+          <button type="submit" className="btn btn-ghost btn-sm">Sign out</button>
+        </form>
+      ) : (
+        <Link href="/?signin=1" className="btn btn-ghost btn-sm self-start">Admin sign in</Link>
+      )}
     </div>
   );
 }
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
-  const admin = await requireAdmin();
+  const admin = await requireViewer();
   const c = await composition();
   const simulated = c.mock + c.seed;
 
   return (
     <div className="min-h-screen md:grid md:grid-cols-[248px_1fr]">
       <MobileNav>
-        <Account email={admin.email} />
+        <Account email={admin.email} isAdmin={admin.isAdmin} />
       </MobileNav>
 
       <aside className="hidden md:flex flex-col justify-between sticky top-0 h-screen px-5 py-7 border-r hairline" style={{ background: "var(--surface)" }}>
@@ -47,7 +53,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
           </div>
           <SidebarNav />
         </div>
-        <Account email={admin.email} />
+        <Account email={admin.email} isAdmin={admin.isAdmin} />
       </aside>
 
       <div className="min-w-0">

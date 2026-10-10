@@ -2,9 +2,8 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/app/actions/auth";
 import { HeroVideo } from "@/components/hero-video";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { WebCall } from "@/components/web-call";
 import { getSession } from "@/lib/auth";
-import { getEnv, integrationStatus } from "@/lib/env";
+import { getEnv } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +15,11 @@ const ERRORS: Record<string, string> = {
   config: "Sign-in is not configured on this server yet (SESSION_SECRET).",
 };
 
-export default async function EntryPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string }> }) {
-  const { error, next } = await searchParams;
+export default async function EntryPage({ searchParams }: { searchParams: Promise<{ error?: string; next?: string; signin?: string }> }) {
+  const { error, next, signin } = await searchParams;
   if (await getSession()) redirect("/dashboard");
+  // With PUBLIC_DASHBOARD on, visitors go straight to the dashboard; the form is only for admins who ask for it.
+  if (getEnv().PUBLIC_DASHBOARD && !signin && !error) redirect("/dashboard");
   const configured = !!getEnv().SESSION_SECRET && getEnv().SESSION_SECRET!.length >= 32;
 
   return (
@@ -38,7 +39,6 @@ export default async function EntryPage({ searchParams }: { searchParams: Promis
             See how many calls were answered, which leads were worth a designer&rsquo;s time, which consultations were booked &mdash; and what it all
             costs to run.
           </p>
-          <WebCall available={integrationStatus("vaani").mode === "live"} />
         </div>
 
         <form action={signIn} className="card p-6 md:p-7 fade-rise-d4 text-ink" style={{ background: "color-mix(in srgb, var(--surface) 94%, transparent)" }}>

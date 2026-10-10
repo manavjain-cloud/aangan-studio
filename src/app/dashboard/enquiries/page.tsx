@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { Filters, buildHref, parseScope } from "@/components/filters";
 import { DispositionBadge, Empty, ModeBadge, PageHeader, Section } from "@/components/ui";
-import { requireAdmin } from "@/lib/auth";
+import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
 import { listEnquiries, resolveRange } from "@/lib/services/analytics";
 import { formatDateTimeInZone } from "@/lib/time";
@@ -20,7 +20,7 @@ const DISPOSITIONS: Array<[string, string]> = [
 ];
 
 export default async function EnquiriesPage({ searchParams }: { searchParams: Promise<SP> }) {
-  await requireAdmin();
+  await requireViewer();
   const sp = await searchParams;
   const range = resolveRange(sp);
   const scope = parseScope(sp.data);
