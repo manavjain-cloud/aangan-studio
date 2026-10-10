@@ -214,3 +214,14 @@ describe("knowledge layer and pricing policy", () => {
     expect(crypto.randomBytes(4)).toHaveLength(4);
   });
 });
+
+describe("environment values pasted with wrapping quotes", () => {
+  afterEach(() => setTestEnv({ EMAIL_FROM: "Aangan Studio <onboarding@resend.dev>" }));
+  it("strips matching quotes so a quoted EMAIL_FROM is still a valid sender", async () => {
+    const { getEnv } = await import("@/lib/env");
+    setTestEnv({ EMAIL_FROM: '"Aangan Studio <onboarding@resend.dev>"' });
+    expect(getEnv().EMAIL_FROM).toBe("Aangan Studio <onboarding@resend.dev>");
+    setTestEnv({ EMAIL_FROM: "'a@b.co'" });
+    expect(getEnv().EMAIL_FROM).toBe("a@b.co");
+  });
+});

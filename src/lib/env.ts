@@ -6,7 +6,9 @@ import { z } from "zod";
  * NEXT_PUBLIC_* variables and `server-only` makes bundling this into client code a build error.
  */
 
-const optional = z.string().trim().min(1).optional();
+/** Values pasted into hosting dashboards often keep their wrapping quotes; they are never part of the value. */
+const unquote = (v: unknown) => (typeof v === "string" ? v.trim().replace(/^(["'])(.*)\1$/s, "$2") : v);
+const optional = z.preprocess(unquote, z.string().trim().min(1).optional());
 const flag = z
   .enum(["1", "0", "true", "false", ""])
   .optional()
