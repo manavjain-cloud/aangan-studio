@@ -45,6 +45,10 @@ const eventSchema = z
         dispositions: z.record(z.string(), z.unknown()).nullable().optional(),
         from_number: z.string().optional(),
         phone_number: z.string().optional(),
+        call_type: z.string().optional(),
+        picked_up_at: z.string().optional(),
+        reason: z.string().optional(),
+        transfer_type: z.string().optional(),
       })
       .passthrough()
       .optional(),
@@ -80,7 +84,8 @@ export async function handleVaaniEvent(db: Db, raw: unknown): Promise<WebhookRes
   const ev = parsed.data;
   const vaaniCallId = callIdOf(ev)!;
 
-  if (ev.direction && /outbound/i.test(ev.direction)) {
+  const direction = ev.direction ?? ev.data?.call_type;
+  if (direction && /outbound/i.test(direction)) {
     return { status: "ignored", event: ev.event, reason: "outbound calls are out of scope for this build" };
   }
 
@@ -128,20 +133,23 @@ async function applyEvent(db: Db, ctx: CallContext, ev: VaaniEvent): Promise<Web
       return { status: "processed", event: ev.event, callId };
     }
     case "user_picked_up_at": {
-      await db.update(calls).set({ answeredAt: eventTime(ev), answered: true, updatedAt: new Date() }).where(eq(calls.id, callId));
+      const pickedUp = ev.data?.picked_up_at && !Number.isNaN(Date.parse(ev.data.picked_up_at)) ? new Date(ev.data.picked_up_at) : eventTime(ev);
+      await db.update(calls).set({ answeredAt: pickedUp, answered: true, updatedAt: new Date() }).where(eq(calls.id, callId));
       await transitionCall(db, callId, "agent_active", { event: ev.event });
       return { status: "processed", event: ev.event, callId };
     }
     case "call_ended": {
-      const durationMs = ev.call_duration !== undefined ? Math.round(ev.call_duration * 1000) : null; // seconds in this event
+      const seconds = ev.call_duration ?? ev.data?.call_duration; // seconds in this event; Vaani nests it under data
+      const durationMs = seconds !== undefined ? Math.round(seconds * 1000) : null;
+      const endReason = ev.end_reason ?? ev.data?.end_reason ?? null;
       const answered = ctx.call.answered || (durationMs !== null && durationMs >= 5_000);
-      await db.update(calls).set({ endedAt: eventTime(ev), durationMs, endReason: ev.end_reason ?? null, answered, updatedAt: new Date() }).where(eq(calls.id, callId));
+      await db.update(calls).set({ endedAt: eventTime(ev), durationMs, endReason, answered, updatedAt: new Date() }).where(eq(calls.id, callId));
       const [fresh] = await db.select({ state: calls.state }).from(calls).where(eq(calls.id, callId)).limit(1);
       const state = fresh!.state as CallState;
       // Safety net: if Vaani's post-processing webhook never arrives, still enrich and hand off this call later.
       await enqueue(db, { type: "postcall_enrich", key: `postcall-fallback:${callId}`, payload: { callId, fallback: true }, delaySec: 900, maxAttempts: 6 });
       if (EARLY_STATES.includes(state)) {
-        await transitionCall(db, callId, "abandoned", { endReason: ev.end_reason ?? null });
+        await transitionCall(db, callId, "abandoned", { endReason });
         // A caller who got cut off must not be lost: ask the front desk to call back (skipped if they redial).
         if (ctx.call.fromNumber && answered) {
           await enqueue(db, { type: "send_email", key: `email:dropped:${callId}`, payload: { kind: "dropped_call", callId }, delaySec: 600 });
@@ -161,14 +169,15 @@ async function applyEvent(db: Db, ctx: CallContext, ev: VaaniEvent): Promise<Web
     }
     case "human_transfer_initiated":
     case "human_transfer_successful": {
-      await logCallEvent(db, callId, ev.event, { transferType: ev.transfer_type ?? null });
+      await logCallEvent(db, callId, ev.event, { transferType: ev.transfer_type ?? ev.data?.transfer_type ?? null });
       return { status: "processed", event: ev.event, callId };
     }
     case "human_transfer_failed": {
-      await logCallEvent(db, callId, ev.event, { reason: ev.reason ?? null });
+      const reason = ev.reason ?? ev.data?.reason ?? null;
+      await logCallEvent(db, callId, ev.event, { reason });
       await createEscalation(db, {
         enquiryId: ctx.enquiry.id, callId, kind: "senior_requested", urgency: "high", mode: ctx.call.mode,
-        reason: `A warm transfer to a human failed (${ev.reason ?? "no reason given"}). The caller still needs a callback.`,
+        reason: `A warm transfer to a human failed (${reason ?? "no reason given"}). The caller still needs a callback.`,
         requestedResponse: "Call the customer back immediately.",
       });
       return { status: "processed", event: ev.event, callId };

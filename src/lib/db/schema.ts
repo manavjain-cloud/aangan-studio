@@ -95,6 +95,8 @@ export const calls = pgTable(
     id: id(),
     /** Vaani call_id / room_name. Unique per mode so seed/mock data can never collide with live calls. */
     vaaniCallId: text("vaani_call_id").notNull(),
+    /** Short code the agent receives from the first tool call and echoes in later ones (Vaani passes no call id to tools). */
+    callRef: text("call_ref"),
     enquiryId: uuid("enquiry_id").references(() => enquiries.id),
     contactId: uuid("contact_id").references(() => contacts.id),
     direction: text("direction").notNull().default("inbound"),
@@ -122,6 +124,7 @@ export const calls = pgTable(
   },
   (t) => [
     uniqueIndex("calls_vaani_call_mode_uq").on(t.vaaniCallId, t.mode),
+    uniqueIndex("calls_call_ref_uq").on(t.callRef),
     index("calls_received_idx").on(t.receivedAt),
     index("calls_enquiry_idx").on(t.enquiryId),
     index("calls_from_idx").on(t.fromNumber, t.receivedAt),

@@ -306,3 +306,37 @@ describe("post-call processing: Gemini, HubSpot, email, compliance", () => {
     expect(JSON.stringify(evs)).not.toMatch(/priya@|\+9198/); // PII is redacted from event detail
   });
 });
+
+describe("Vaani's real webhook payload shape (nested under `data`)", () => {
+  let hh: Harness;
+  beforeEach(async () => {
+    hh = await makeHarness();
+  });
+  afterEach(async () => {
+    await hh.close();
+  });
+
+  it("creates the call from data.*, reads duration/end reason from data, and honours picked_up_at", async () => {
+    const r = await hh.webhook({ event: "call_started", timestamp: "2026-10-12T05:00:00Z", data: { call_id: "r1", room_name: "r1", call_type: "Inbound", agent_name: "A", phone_number: "+919876500001" } });
+    expect(r.status).toBe("processed");
+    await hh.webhook({ event: "user_picked_up_at", timestamp: "2026-10-12T05:00:09Z", data: { call_id: "r1", room_name: "r1", picked_up_at: "2026-10-12T05:00:03Z" } });
+    await hh.webhook({ event: "call_ended", timestamp: "2026-10-12T05:02:00Z", data: { call_id: "r1", room_name: "r1", end_reason: "completed", call_duration: 120, technical_issue: false } });
+    const [c] = await hh.db.select().from(calls);
+    expect(c!.fromNumber).toBe("+919876500001");
+    expect(c!.answeredAt!.toISOString()).toBe("2026-10-12T05:00:03.000Z");
+    expect(c!.durationMs).toBe(120_000);
+    expect(c!.endReason).toBe("completed");
+  });
+
+  it("Outbound calls (call_type inside data) are ignored: this build is inbound-only", async () => {
+    const r = await hh.webhook({ event: "call_started", data: { call_id: "o1", room_name: "o1", call_type: "Outbound", phone_number: "+919876500002" } });
+    expect(r.status).toBe("ignored");
+    expect(await hh.db.select().from(calls)).toHaveLength(0);
+  });
+
+  it("the dashboard connectivity-test payload (a batch under `events`) is acknowledged and logged, creating no call", async () => {
+    const r = await hh.webhook({ event: "webhook_test", timestamp: "2026-10-12T05:00:00Z", events: [{ event: "call_started", data: { call_id: "test_room_123", room_name: "test_room_123" } }] });
+    expect(r.status).toBe("ignored");
+    expect(await hh.db.select().from(calls)).toHaveLength(0);
+  });
+});

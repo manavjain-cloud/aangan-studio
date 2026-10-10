@@ -14,7 +14,7 @@ import { sha256Hex } from "../security/hmac";
 import { DEFAULT_TZ, isAfterHours, isoDateInZone, zonedParts } from "../time";
 import { bookConsultation, getAvailableSlots, type SlotsOutcome, type TimeOfDay } from "./booking";
 import { createEscalation } from "./escalations";
-import { currentCallMode, ensureCallContext, findActiveCallByPhone, findSoleActiveCall, normalizePhone, type CallContext } from "./ingest";
+import { currentCallMode, ensureCallContext, ensureCallRef, findActiveCallByPhone, findCallByRef, findSoleActiveCall, normalizePhone, type CallContext } from "./ingest";
 import { enqueue } from "./outbox";
 import { evaluateAndPersist, saveFacts } from "./qualify";
 import { getQualificationConfig } from "./settings";
@@ -110,26 +110,50 @@ export async function handleToolRequest(db: Db, rawBody: unknown, meta: ToolRequ
     return reply({ ok: false, status: "rate_limited", error: { code: "rate_limited", message: `Too many requests; retry in ${ipLimit.retryAfterSec}s` } }, 429);
   }
 
-  const mode = currentCallMode();
+  const sessionMode = typeof data.session_mode === "string" ? data.session_mode.trim().slice(0, 40) : "";
+  // Vaani's {{call_mode}} says whether this is a phone call or a browser/chat test. Tests are labelled simulated.
+  const isTestSession = /test|chat|web|browser|widget|simulat/i.test(sessionMode);
+  const mode = isTestSession ? "mock" : currentCallMode();
+  const callRef = cleanId(data.call_ref, 40)?.toUpperCase();
   const config = await getQualificationConfig(db);
 
-  // Resolve the call. Prefer the explicit Vaani call id; fall back to the caller's number.
+  // Vaani passes no call identity to custom tools, so the call is resolved through a chain:
+  // explicit call_id -> call_ref (issued by get_call_context) -> caller number -> the ONE call in progress.
   let ctx: CallContext | null = null;
+  let resolvedBy = "none";
   if (vaaniCallId) {
     ctx = await ensureCallContext(db, { vaaniCallId, fromNumber: phone, mode, businessHours: config.businessHours, source: "tool" });
-  } else if (phone) {
-    const active = await findActiveCallByPhone(db, phone, mode);
-    if (active) ctx = await ensureCallContext(db, { vaaniCallId: active.vaaniCallId, fromNumber: phone, mode, businessHours: config.businessHours, source: "tool" });
+    resolvedBy = "call_id";
+  } else if (callRef) {
+    const byRef = await findCallByRef(db, callRef);
+    if (byRef) {
+      ctx = await ensureCallContext(db, { vaaniCallId: byRef.vaaniCallId, fromNumber: byRef.fromNumber, mode: byRef.mode, businessHours: config.businessHours, source: "tool" });
+      resolvedBy = "call_ref";
+    }
   }
-  let resolvedBy = vaaniCallId ? "call_id" : phone ? "caller_phone" : "none";
-  if (!ctx && !vaaniCallId && !phone) {
+  if (!ctx && phone) {
+    const active = await findActiveCallByPhone(db, phone, mode);
+    if (active) {
+      ctx = await ensureCallContext(db, { vaaniCallId: active.vaaniCallId, fromNumber: phone, mode, businessHours: config.businessHours, source: "tool" });
+      resolvedBy = "caller_phone";
+    }
+  }
+  if (!ctx && !vaaniCallId && !callRef && !phone) {
     const sole = await findSoleActiveCall(db, mode);
     if (sole.call) {
       ctx = await ensureCallContext(db, { vaaniCallId: sole.call.vaaniCallId, fromNumber: sole.call.fromNumber, mode, businessHours: config.businessHours, source: "tool" });
       resolvedBy = "sole_active_call";
-      await logCallEvent(db, ctx.call.id, "call_resolved_by_recency", { action });
     }
   }
+  // A conversation that starts with get_call_context but has no call event (e.g. a browser test) gets its own session.
+  if (!ctx && action === "get_call_context" && !callRef) {
+    const id = `adhoc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+    ctx = await ensureCallContext(db, { vaaniCallId: id, fromNumber: null, mode, businessHours: config.businessHours, source: "tool" });
+    // No call lifecycle events will ever arrive for it, so close it now (it must never look "in progress").
+    await db.update(calls).set({ endedAt: new Date(), answered: true, answeredAt: new Date() }).where(eq(calls.id, ctx.call.id));
+    resolvedBy = "adhoc_session";
+  }
+  if (ctx && resolvedBy !== "call_id") await logCallEvent(db, ctx.call.id, "call_resolved", { action, resolvedBy, sessionMode: sessionMode || null });
   if (!ctx) {
     // Diagnostics for set-up: record WHICH fields/headers arrived (names only) so the Vaani tool mapping can be corrected.
     await db.insert(integrationEvents).values({
@@ -262,10 +286,12 @@ async function getCallContext(db: Db, ctx: CallContext, config: Awaited<ReturnTy
   const known = Object.fromEntries(KNOWN_FIELDS_FOR_AGENT.map((k) => [k, ctx.enquiry.facts[k]]).filter(([, v]) => v !== null));
   const repeat = !!ctx.call.relatedCallId;
   await advanceThrough(db, ctx.call.id, ["agent_active"]);
+  const callRef = await ensureCallRef(db, ctx.call);
   return reply({
     ok: true,
     status: "context",
     data: {
+      call_ref: callRef,
       today: isoDateInZone(now, DEFAULT_TZ),
       weekday: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][p.weekday],
       local_time: `${String(p.hour).padStart(2, "0")}:${String(p.minute).padStart(2, "0")}`,
@@ -276,7 +302,7 @@ async function getCallContext(db: Db, ctx: CallContext, config: Awaited<ReturnTy
     },
     instruction: repeat
       ? "This caller was disconnected earlier. Welcome them back, do not ask again for anything listed in already_known."
-      : "Use `today` to turn phrases like 'by March' into an ISO date (YYYY-MM-DD) when saving progress. Do not mention internal systems.",
+      : `Remember call_ref (${callRef}) and include it as the call_ref parameter in EVERY other tool call for this conversation. Use today to turn phrases like 'by March' into an ISO date (YYYY-MM-DD) when saving progress. Do not mention internal systems.`,
   });
 }
 

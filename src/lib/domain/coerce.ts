@@ -50,7 +50,11 @@ export function looseString(v: unknown, max = 500): string | null {
   return cleaned.length > max ? cleaned.slice(0, max) : cleaned;
 }
 
-export const zNumber = z.preprocess(looseNumber, z.number().nullable());
+/** Facts are quantities (areas, rooms, rupees): zero or negative means "not stated" (tool runners send 0 for blanks). */
+export const zNumber = z.preprocess((v) => {
+  const n = looseNumber(v);
+  return n !== null && n > 0 ? n : null;
+}, z.number().nullable());
 export const zBool = z.preprocess(looseBoolean, z.boolean().nullable());
 export const zText = (max = 500) => z.preprocess((v) => looseString(v, max), z.string().nullable());
 

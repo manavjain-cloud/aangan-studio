@@ -112,11 +112,21 @@ export function emptyFacts(): EnquiryFacts {
   return enquiryFactsSchema.parse({});
 }
 
-/** Merge new facts over old: a non-null incoming value wins, null never erases a known value. */
+/**
+ * Flags that, once true, stay true. Vaani's tool runner sends EVERY parameter on every call (empty or default),
+ * so a later `false` must never silently clear a complaint, a request for a senior person, or similar signals.
+ */
+const STICKY_TRUE: ReadonlyArray<keyof EnquiryFacts> = [
+  "existing_customer_complaint", "requests_senior", "caller_frustrated", "missed_followup", "structural_changes_required", "asked_about_pricing",
+];
+
+/** Merge new facts over old: a non-null incoming value wins, null never erases a known value, sticky flags never revert. */
 export function mergeFacts(base: EnquiryFacts, incoming: Partial<EnquiryFacts>): EnquiryFacts {
   const out: Record<string, unknown> = { ...base };
   for (const [k, v] of Object.entries(incoming)) {
-    if (v !== null && v !== undefined) out[k] = v;
+    if (v === null || v === undefined) continue;
+    if (STICKY_TRUE.includes(k as keyof EnquiryFacts) && base[k as keyof EnquiryFacts] === true) continue;
+    out[k] = v;
   }
   return out as EnquiryFacts;
 }

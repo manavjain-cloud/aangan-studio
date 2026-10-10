@@ -304,3 +304,76 @@ describe("workflow state and data labelling", () => {
     expect(rows.every((n) => n.status === "sent" && n.mode === "mock")).toBe(true);
   });
 });
+
+describe("call identity when Vaani passes none (call_ref, ad-hoc sessions, session mode)", () => {
+  let hh: Harness;
+  beforeEach(async () => {
+    hh = await makeHarness();
+  });
+  afterEach(async () => {
+    await hh.close();
+  });
+
+  it("get_call_context issues a call_ref; later tools using it reach the SAME call even while two calls are in progress", async () => {
+    await hh.webhook({ event: "call_started", timestamp: "2026-10-12T06:00:00Z", data: { call_id: "room-A", room_name: "room-A", call_type: "Inbound", phone_number: "+919800000101" } });
+    const ctx = await hh.tool("get_call_context", {}, "");
+    const ref = (ctx.body.data as { call_ref: string }).call_ref;
+    expect(ref).toMatch(/^[2-9A-HJ-NP-Z]{5}$/);
+    expect(ctx.body.instruction).toContain(ref);
+    await hh.webhook({ event: "call_started", timestamp: "2026-10-12T06:00:30Z", data: { call_id: "room-B", room_name: "room-B", call_type: "Inbound", phone_number: "+919800000102" } });
+
+    const saved = await hh.tool("save_enquiry_progress", { call_ref: ref.toLowerCase(), caller_name: "Alpha", location_text: "Baner" }, "");
+    expect(saved.body.ok).toBe(true);
+    const rows = await hh.db.select().from(calls).orderBy(calls.receivedAt);
+    const enq = await hh.db.select().from(enquiries);
+    expect(rows.map((c) => c.vaaniCallId)).toEqual(["room-A", "room-B"]);
+    const aEnq = enq.find((e) => e.id === rows[0]!.enquiryId)!;
+    const bEnq = enq.find((e) => e.id === rows[1]!.enquiryId)!;
+    expect(aEnq.facts.caller_name).toBe("Alpha");
+    expect(bEnq.facts.caller_name).toBeNull();
+
+    // With no ref and two calls in progress the server refuses to guess.
+    const ambiguous = await hh.tool("save_enquiry_progress", { caller_name: "Who" }, "");
+    expect(ambiguous.httpStatus).toBe(422);
+  });
+
+  it("an unknown or garbage call_ref never attaches to another call", async () => {
+    await hh.webhook({ event: "call_started", data: { call_id: "room-X", room_name: "room-X", phone_number: "+919800000111" } });
+    await hh.webhook({ event: "call_started", data: { call_id: "room-Y", room_name: "room-Y", phone_number: "+919800000112" } });
+    const r = await hh.tool("save_enquiry_progress", { call_ref: "ZZZZZ", caller_name: "Nobody" }, "");
+    expect(r.httpStatus).toBe(422);
+    expect((await hh.db.select().from(enquiries)).every((e) => e.facts.caller_name === null)).toBe(true);
+  });
+
+  it("a browser/chat test with no call event gets its own closed ad-hoc session, labelled simulated, and works end to end", async () => {
+    const ctx = await hh.tool("get_call_context", { session_mode: "chat" }, "");
+    const ref = (ctx.body.data as { call_ref: string }).call_ref;
+    const [c] = await hh.db.select().from(calls);
+    expect(c!.vaaniCallId).toMatch(/^adhoc-/);
+    expect(c!.mode).toBe("mock");
+    expect(c!.endedAt).not.toBeNull(); // never "in progress"
+    const ev = await hh.tool("evaluate_qualification", { ...QUALIFYING_FACTS, call_ref: ref }, "");
+    expect(ev.body.status).toBe("qualified");
+    expect((await hh.db.select().from(calls))).toHaveLength(1);
+  });
+
+  it("a real phone call (session mode 'phone') is not treated as a test", async () => {
+    await hh.webhook({ event: "call_started", data: { call_id: "room-P", room_name: "room-P", phone_number: "+919800000121" } });
+    await hh.tool("get_call_context", { session_mode: "phone" }, "");
+    const [c] = await hh.db.select().from(calls);
+    expect(c!.vaaniCallId).toBe("room-P");
+    expect(c!.callRef).not.toBeNull();
+  });
+
+  it("the agent sending every parameter with defaults does not corrupt the record or clear a complaint", async () => {
+    const ctx = await hh.tool("get_call_context", { session_mode: "chat" }, "");
+    const ref = (ctx.body.data as { call_ref: string }).call_ref;
+    await hh.tool("escalate_to_human", { call_ref: ref, reason: "complaint", details: "no reply for days" }, "");
+    const defaults = { call_ref: ref, caller_name: "", project_type: "", bhk: 0, carpet_area_sqft: 0, is_rented: false, existing_customer_complaint: false, requests_senior: false, budget_inr_max: 0, desired_completion_date: "" };
+    const r = await hh.tool("save_enquiry_progress", defaults, "");
+    expect(r.body.ok).toBe(true);
+    const [e] = await hh.db.select().from(enquiries);
+    expect(e!.facts.existing_customer_complaint).toBe(true);
+    expect(e!.facts.bhk).toBeNull();
+  });
+});

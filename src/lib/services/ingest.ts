@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, ne, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, ne, not, or } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { calls, contacts, enquiries, type DataMode } from "../db/schema";
 import type { QualificationConfig } from "../domain/config";
@@ -187,8 +187,34 @@ export async function findSoleActiveCall(db: Db, mode: DataMode): Promise<{ call
   const rows = await db
     .select()
     .from(calls)
-    .where(and(eq(calls.mode, mode), gte(calls.receivedAt, since), isNull(calls.endedAt)))
+    .where(and(eq(calls.mode, mode), gte(calls.receivedAt, since), isNull(calls.endedAt), not(like(calls.vaaniCallId, "adhoc-%"))))
     .orderBy(desc(calls.receivedAt))
     .limit(3);
   return rows.length === 1 ? { call: rows[0]!, ambiguous: false } : { call: null, ambiguous: rows.length > 1 };
+}
+
+const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // no 0/O/1/I/L: easy for a model to carry and echo
+
+function newRef(): string {
+  let out = "";
+  for (let i = 0; i < 5; i++) out += REF_ALPHABET[Math.floor(Math.random() * REF_ALPHABET.length)];
+  return out;
+}
+
+/** Gives the call a short reference (idempotent) that the agent echoes back in later tool calls. */
+export async function ensureCallRef(db: Db, call: CallRow): Promise<string> {
+  if (call.callRef) return call.callRef;
+  for (let i = 0; i < 6; i++) {
+    const ref = newRef();
+    const rows = await db.update(calls).set({ callRef: ref }).where(and(eq(calls.id, call.id), isNull(calls.callRef))).returning({ ref: calls.callRef }).catch(() => []);
+    if (rows[0]?.ref) return rows[0].ref;
+    const [again] = await db.select({ ref: calls.callRef }).from(calls).where(eq(calls.id, call.id)).limit(1);
+    if (again?.ref) return again.ref;
+  }
+  throw new Error("could not allocate a call reference");
+}
+
+export async function findCallByRef(db: Db, ref: string): Promise<CallRow | null> {
+  const [row] = await db.select().from(calls).where(eq(calls.callRef, ref.trim().toUpperCase())).limit(1);
+  return row ?? null;
 }

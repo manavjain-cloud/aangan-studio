@@ -346,6 +346,17 @@ describe("facts parsing is lenient but never invents values", () => {
     expect(f.desired_completion_date).toBeNull(); // unparseable dates are unknown, not guessed
   });
 
+  it("tool runners that send defaults for every field: zeros are 'not stated' and safety flags never revert to false", () => {
+    const first = enquiryFactsSchema.parse({ existing_customer_complaint: true, location_text: "Viman Nagar", bhk: 2 });
+    const defaults = enquiryFactsSchema.parse({ existing_customer_complaint: false, requests_senior: "", bhk: 0, carpet_area_sqft: "0", budget_inr_max: 0, rooms_count: "", location_text: "" });
+    expect(defaults.bhk).toBeNull();
+    expect(defaults.budget_inr_max).toBeNull();
+    const merged = mergeFacts(first, defaults);
+    expect(merged.existing_customer_complaint).toBe(true);
+    expect(merged.bhk).toBe(2);
+    expect(merged.location_text).toBe("Viman Nagar");
+  });
+
   it("mergeFacts: null never erases a known value", () => {
     const merged = mergeFacts(enquiryFactsSchema.parse({ location_text: "Baner", bhk: 2 }), { location_text: null, bhk: 3 });
     expect(merged.location_text).toBe("Baner");
