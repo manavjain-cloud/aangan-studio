@@ -1,0 +1,401 @@
+AANGAN STUDIO — ACCEPT / REJECT RUBRIC
+Lead Qualification, Importance Scores, Nine Checks, and Workflow Actions
+Version: 1.0
+Scope: Incoming phone calls only
+
+PURPOSE
+This rubric defines how the AI Voice Agent should qualify incoming phone enquiries, when it should accept,
+clarify, reject, or escalate a call, and how the result should flow into the four downstream outputs:
+1. HubSpot
+2. Email notification
+3. Calendly booking
+4. Management dashboard
+
+The rubric is based on the supplied MESA Case 03 brief, services.md, qualified.md, pricing.md, the
+September 2026 enquiry transcripts, the latest Components Map, and the Nine Checks framework.
+
+IMPORTANT DISTINCTION
+There are two different rubrics in this document:
+A. Lead qualification: decides whether an enquiry should be passed to a designer.
+B. Nine Checks: decides whether the automation itself deserves to be built and operated.
+Do not use the Nine Checks score to qualify individual customers, and do not use a lead score to override
+a clear service, scope, or timeline exclusion.
+
+===============================================================================
+PART A — LEAD ACCEPTANCE / REJECTION RUBRIC
+===============================================================================
+
+A1. WEIGHTED IMPORTANCE SCORE (100 POINTS)
+
+The source documents define five qualification criteria but do not assign numeric weights. The weights
+below are PROPOSED implementation weights, based on the rubric's ordering and the importance of each
+criterion to service fit. They should be approved by Nikhil before production use.
+
+Criterion 1 — Real project with design AND execution
+Importance: 30 / 100
+PASS (+30):
+- The caller wants Aangan to provide design and execution, not just advice.
+- Eligible examples include a residential full-home project, a qualifying partial-home project, or a
+  complete single-room redesign with materials, furniture, and execution.
+- Commercial projects may qualify when they fit Aangan's office / clinic / studio scope and size.
+FAIL (0):
+- Advice-only, styling-only, a second opinion, or the caller will handle execution themselves.
+- Standalone furniture sourcing or standalone Vastu advice.
+- Retail, hospitality, restaurants, hotels, or gyms.
+CLARIFY:
+- If it is unclear whether execution is required, ask one direct question:
+  "Are you looking for full design and execution, or design advice only?"
+Notes:
+- A single-room project is not automatically disqualified if full execution is included.
+- A rented apartment is acceptable if the scope is suitable and no structural changes are required.
+
+Criterion 2 — Inside Aangan's service area
+Importance: 25 / 100
+PASS (+25):
+- The project is in Pune city or PCMC, within the areas served by Aangan.
+FAIL (0):
+- The project is outside the service area, including Nashik, Talegaon, Lonavala, Mumbai, or other
+  unserved locations.
+CLARIFY:
+- If the location is missing or ambiguous, ask:
+  "Which locality is the property in?"
+Notes:
+- Do not make an exception based on project size, referral, or willingness to pay if Aangan cannot
+  serve the location with its current vendor network.
+
+Criterion 3 — Realistic timeline and site readiness
+Importance: 20 / 100
+PASS (+20):
+- The required completion date is feasible for the described scope and the site will be available in time.
+- Use Aangan's stated design and execution durations to assess feasibility. The services guide gives a
+  3–4 week design phase and 8–16 weeks of execution, depending on project size and site readiness.
+FAIL (0):
+- The caller requires completion on a clearly impossible timeline, such as a three-week turnaround
+  for a project that requires design and execution.
+CLARIFY:
+- If the deadline or site availability is unclear, ask:
+  "When would you need the project completed, and when will the site be available?"
+Notes:
+- Do not promise a completion date. If feasibility is uncertain, route to human review.
+- The qualification guide says the timeline must realistically allow execution and gives a three-week
+  deadline as an example that Aangan cannot serve well.
+- The services guide separately states that Aangan cannot begin execution on a project that needs to
+  be ready in under six weeks from today. Use these timing rules conservatively.
+
+Criterion 4 — Budget broadly fits, based ONLY on volunteered information
+Importance: 15 / 100
+PASS (+15):
+- The caller volunteers a budget that does not clearly conflict with the described project scope.
+- If no budget is mentioned, treat the criterion as qualified / neutral and do not deduct points.
+FAIL (0):
+- The caller voluntarily states a budget that is clearly below what the described scope can reasonably
+  support, such as ₹1–1.5 lakh for a kitchen and bedroom project with full execution.
+CLARIFY / HUMAN REVIEW:
+- Do not probe for a budget. If the volunteered figure is ambiguous, do not invent an estimate; record
+  what the caller said and route for review if needed.
+Mandatory restrictions:
+- Never ask the caller to state a budget as a qualification requirement.
+- Never quote an amount, per-square-foot figure, price range, or "starting from" price.
+- If asked about price, use only the approved response:
+  "Pricing depends on the site, the materials you choose, and the scope — your designer will walk you
+  through it in detail at the consultation. I can book that for you right now if you'd like."
+- The pricing guide is internal context only. It is not permission for the agent to quote prices.
+- Asking about pricing does NOT disqualify an enquiry.
+
+Criterion 5 — Decision-maker or authorised representative
+Importance: 10 / 100
+PASS (+10):
+- The caller is the decision-maker, or is authorised by the decision-maker to move forward.
+- A spouse or another representative is acceptable when the caller confirms they have authority.
+FAIL (0):
+- The caller clearly says they are only researching for someone else and are not authorised to proceed.
+CLARIFY:
+- If authority is unclear, do not pressure the caller. Treat as provisionally qualified, note the
+  uncertainty, and ensure the relevant decision-maker will be involved in the consultation.
+
+TOTAL IMPORTANCE SCORE: 100 POINTS
+Criterion 1: 30
+Criterion 2: 25
+Criterion 3: 20
+Criterion 4: 15
+Criterion 5: 10
+
+A2. HOW TO INTERPRET THE SCORE
+
+The numeric score is a decision aid, not a substitute for Nikhil's qualification rules.
+- 90–100: Strong apparent fit, provided no hard exclusion exists.
+- 75–89: Potential fit. Check that the first three criteria are explicitly satisfied and record any
+  uncertainty in criteria 4 or 5.
+- Below 75: Review the criterion-level results. Do not automatically reject on score alone.
+- Any explicit out-of-scope project, out-of-area location, impossible timeline, or clearly unacceptable
+  volunteered budget must be handled according to the decision rules below, regardless of total score.
+- Unknown answers to criteria 1, 2, or 3 must not be silently treated as passes: ask one direct question.
+- Unknown budget or decision-maker details must not automatically reduce the score. The source rubric
+  says to treat uncertainty in criteria 4 or 5 as qualified and record it in the handoff note.
+
+A3. DECISION OUTCOMES
+
+1. ACCEPT / QUALIFIED
+Use when:
+- The project is for design and execution and within Aangan's scope.
+- The project is in Pune / PCMC.
+- The timeline appears feasible and the site can be made available in time.
+- There is no clearly stated budget mismatch.
+- The caller is the decision-maker / authorised representative, or uncertainty about criterion 5 is
+  recorded without blocking qualification.
+
+Actions:
+- Summarise the caller's information and qualification rationale.
+- Ask the qualified customer what times they are available.
+- Use Calendly to find an available slot with the assigned designer and book the consultation for both
+  the customer and designer. Send the invitation / confirmation to both.
+- Create or update the HubSpot contact / lead record with the call summary, qualification outcome,
+  source, and booking details.
+- Email the relevant designer or front-desk person an actionable notification with the lead context.
+  They should not need access to the management dashboard.
+- Include the lead and booking outcome in dashboard metrics.
+
+2. CLARIFY BEFORE DECIDING
+Use when a material item in criteria 1, 2, or 3 is unclear.
+- Ask one direct question, not a long questionnaire.
+- Update the structured call record with the answer.
+- Do not book a designer consultation until qualification is established.
+- If the caller cannot clarify, record the unknown and route for human review rather than inventing facts.
+
+3. REJECT / CLOSE GRACEFULLY
+Use for a clear mismatch with Aangan's scope, service area, timeline, or a clearly inadequate budget
+volunteered by the caller.
+- Give a polite, honest explanation based on the actual mismatch.
+- Do not quote prices or make unsupported claims.
+- Do not create a Calendly booking for a rejected lead.
+- Record the reason and outcome in HubSpot / reporting so the team can understand rejection patterns.
+- Do not send an ordinary qualified-lead email. Notify a human only if the case needs follow-up.
+
+4. HUMAN ESCALATION
+Use for:
+- Existing-client complaints or an active project issue.
+- A caller who is highly frustrated or asks for a senior person.
+- Sensitive exceptions, uncertain feasibility, or situations the agent cannot safely resolve.
+- Unclear cases where automatic acceptance or rejection could cause a material error.
+Actions:
+- Do not run the ordinary new-lead booking flow.
+- Email the responsible human with the customer's details, issue, urgency, and requested response.
+- Record the escalation and its status.
+- Existing project complaints must not be treated as new sales leads.
+
+A4. IMPORTANT SOURCE RULES AND A DOCUMENTED AMBIGUITY
+
+The qualification document contains two instructions that are not perfectly aligned:
+- Its opening states that if any one criterion fails, close gracefully and do not forward an incomplete lead.
+- Its boundary section says to decline gracefully when two or more criteria fail.
+
+Recommended safe implementation until Nikhil confirms the intended precedence:
+- Never forward a lead with a confirmed hard exclusion.
+- For one failed criterion where the outcome is not a clear hard exclusion, do not auto-book. Route it for human review until Nikhil confirms whether one failure alone should trigger a decline.
+- If two or more criteria clearly fail, decline gracefully as stated in the boundary section.
+- Do not allow the numeric importance score to override a failed criterion.
+
+This ambiguity should be resolved with Nikhil before the agent is permitted to auto-reject borderline leads.
+
+A5. ACCEPT / REJECT EXAMPLES FROM THE TRANSCRIPTS
+
+Likely ACCEPT (subject to complete qualification):
+- T01: Kothrud residential full redesign, realistic timeline, owner / spouse authorised.
+- T06: Baner office fitout around 800 sq ft, founder is decision-maker, scope within commercial service.
+- T11: Rented Baner apartment, suitable design/fittings scope, landlord approval, no structural changes.
+- T02 / T13: Pricing questions do not disqualify the lead; deflect pricing and offer consultation.
+
+REJECT / DO NOT BOOK:
+- T03: Nashik project, outside service area.
+- T04: Advice / styling only, not full design and execution.
+- T07: Wants work completed before Diwali within about three weeks; timeline is not feasible for the described work.
+- T10: Caller volunteers ₹1–1.5 lakh for kitchen plus bedroom with full execution, clearly below the described scope.
+- T18: 180 sq ft commercial pod, below the studio's typical commercial scope.
+- T19: Restaurant / hospitality work, outside service scope.
+
+HUMAN ESCALATION:
+- T09: Existing project complaint, requests a senior person.
+- T16: Frustrated returning caller after a missed follow-up; handle carefully rather than treating as a routine new lead.
+
+Do NOT disqualify solely because:
+- The caller phones outside office hours.
+- They ask about pricing.
+- They are uncertain about materials, design style, or layout.
+- They have a rented apartment, provided the project fits the service rules.
+- They do not disclose a budget.
+- It is a single room, if full execution is included.
+
+===============================================================================
+PART B — NINE CHECKS: IS THE AUTOMATION WORTH BUILDING?
+===============================================================================
+
+The case/session framework gives nine checks. The importance weights below are PROPOSED weights for
+prioritising the evaluation; they are not numeric weights supplied by the case. Total importance = 100.
+
+01. PROBLEM REAL? — Importance 15/100 — YES
+Evidence:
+- About 200 enquiries per month.
+- About 48% receive no response within 48 hours.
+- About 33% arrive outside 10 AM–7 PM.
+- Responding within an hour has a stated 4x conversion advantage over next-day response.
+Pass condition: A real operational or customer problem is evidenced, not merely a preference for AI.
+
+02. WORKFLOW REPEATED? — Importance 10/100 — YES
+Evidence:
+- Repeated intake, scope, location, timeline, decision-maker and qualification questions.
+- Designers otherwise repeat questions because handoff context is missing.
+Pass condition: The workflow occurs often enough to justify automation.
+
+03. INPUT AVAILABLE? — Importance 10/100 — YES
+Evidence:
+- Live inbound phone conversation.
+- services.md, qualified.md, pricing.md.
+- September 2026 transcripts provide realistic examples and edge cases.
+Pass condition: The agent has sufficient information to act without making up facts.
+Constraint: Build only for incoming phone calls; WhatsApp and website form automation are out of scope.
+
+04. OUTPUT VALUABLE? — Importance 15/100 — YES
+The four outputs for the overall tool are:
+1. Dashboard for Nikhil / management.
+2. HubSpot records for contacts, qualification, call summaries and booking status.
+3. Email notifications with relevant lead context for the assigned designer / front desk.
+4. Calendly consultation booking for both qualified customer and assigned designer.
+Pass condition: Each output enables a clear business action or visibility that is otherwise missing.
+
+05. IMPACT MEASURABLE? — Importance 10/100 — YES
+Measure:
+- Response time and unanswered / abandoned calls.
+- Qualified, rejected, unclear and escalated enquiries.
+- Calendly booking rate and consultation attendance, where available.
+- Lead-to-project conversion, where CRM tracking is reliable.
+- Cost per call and cost per qualified lead.
+Pass condition: Baselines and post-launch results can be compared.
+
+06. FAILURE RISK OK? — Importance 10/100 — YES, WITH GUARDRAILS
+Required safeguards:
+- Never quote any number or range from the pricing guide.
+- Do not probe for budget.
+- Do not promise project completion dates.
+- Escalate existing-client complaints and sensitive cases.
+- Ask one direct question when criteria 1, 2, or 3 are unclear.
+Pass condition: Errors are bounded and there is a safe human fallback.
+
+07. JUDGMENT PROTECTED? — Importance 10/100 — YES
+Pass condition:
+- AI applies the explicit qualification rules and assembles the lead context.
+- Human designers retain final commercial and design judgement.
+- The AI does not invent qualification criteria or decide design quality.
+- A human is involved for exceptions and material uncertainty.
+
+08. ROI WORTH IT? — Importance 10/100 — LIKELY, VALIDATE
+Evidence:
+- High monthly enquiry volume, missed opportunities, two-person front desk and repetitive qualification work.
+- Average project value in the case is ₹8–14 lakh.
+Validation required:
+- Pilot the system and compare costs against incremental qualified bookings, saved staff time and conversion.
+- Include voice / telephony, AI, integration, Calendly / CRM plan requirements, monitoring and maintenance in the cost.
+Pass condition: Measured or credibly estimated benefits justify total operating cost.
+
+09. OWNER CLEAR? — Importance 10/100 — YES, WITH AN OPERATIONAL OWNER
+Pass condition:
+- Nikhil owns the qualification rubric, service policies and business outcomes.
+- A named operational owner is assigned for HubSpot fields / lead stages, email routing, Calendly setup,
+  dashboard accuracy, and exception monitoring.
+- Ownership for keeping the source files and rules current is explicit.
+
+NINE CHECKS IMPORTANCE TOTAL: 100 / 100
+
+Build recommendation:
+BUILD A CONTROLLED PHONE-ONLY PILOT.
+The problem, repetition, inputs, output value and measurement opportunity are strong. Keep pricing and
+human-judgement guardrails in place, validate ROI using real pilot results, and assign operational
+ownership before scaling.
+
+===============================================================================
+PART C — ALIGNMENT WITH THE LATEST COMPONENTS MAP
+===============================================================================
+
+TRIGGER
+- An incoming call arrives at Aangan's phone number.
+- The call event triggers the workflow. The AI Voice Agent is not the trigger.
+
+INPUT
+- The AI Voice Agent answers / activates for the call.
+- Live conversation, caller ID / phone number, transcript and caller responses are captured.
+- Collect project type, scope, location, area (when relevant), current state, timeline, site availability,
+  decision-maker status and any budget amount the caller volunteers.
+- Do not ask for budget solely to qualify the lead.
+
+CONTEXT
+- services.md: service types, exclusions, area and typical scope.
+- qualified.md: five lead qualification criteria and uncertainty rules.
+- pricing.md: internal price policy and approved pricing deflection, never a customer-facing quote.
+- September enquiry transcripts: examples of common cases, complaints, pricing questions and edge cases.
+
+PROCESSING / AI
+1. Transcribe and extract structured fields.
+2. Check service / project fit.
+3. Check location.
+4. Check timeline and site readiness.
+5. Apply volunteered-budget rule without probing.
+6. Check decision-maker / authorisation.
+7. Classify as ACCEPT, CLARIFY, REJECT, or HUMAN ESCALATION.
+8. For qualified leads, ask for customer availability.
+9. Find a valid designer slot through Calendly and book the consultation for both parties.
+10. Update status and booking result in HubSpot, trigger email notifications when action is needed, and
+    update management metrics.
+
+OUTPUTS — THESE ARE DOWNSTREAM OUTPUTS, NOT TRIGGERS OR CONTEXT
+1. HUBSPOT
+   - Create/update contact and enquiry record.
+   - Store call summary, qualification score and criterion-level outcomes, disposition, escalation reason,
+     owner, and Calendly booking status.
+   - Recommended: log every call/disposition, including rejected calls, so reporting is not biased toward
+     accepted leads.
+
+2. EMAIL NOTIFICATION
+   - Notify the assigned designer or front desk when a qualified handoff or human action is required.
+   - Include the useful summary, qualification rationale, call-back / booking details and any uncertainty.
+   - The designer / front desk does not need dashboard access.
+   - Existing-client complaints route to the appropriate senior person.
+
+3. CALENDLY
+   - Only for qualified leads after the customer agrees to proceed.
+   - Ask when the customer is available.
+   - Match customer availability with the assigned designer's available slot.
+   - Book the Calendly event and include the customer as invitee and the designer as host / assigned
+     participant according to the configured Calendly setup.
+   - Send booking confirmation / calendar invitation to both.
+   - If no suitable slot is found or booking fails, do not claim success; record the status and notify a human.
+
+4. DASHBOARD
+   - Management-only access for Nikhil / authorised leadership.
+   - Show enquiry volume, response time, qualification outcomes, rejections and reasons, escalations,
+     Calendly bookings, conversion where known, and running cost.
+   - Do not make the dashboard the day-to-day interface for designers or front-desk staff.
+
+OUT-OF-SCOPE
+- Do not build WhatsApp automation or website-form automation in this phase.
+- They may be considered in a later phase after validating the phone workflow.
+
+===============================================================================
+PART D — IMPORTANT IMPLEMENTATION RULES
+===============================================================================
+
+1. The internal pricing guide is NOT permission to quote prices. The agent must use the exact approved
+   deflection response and offer a consultation.
+2. Do not ask callers for a budget. Only use budget details they volunteer.
+3. Do not disqualify callers just because they ask about pricing, call after hours, are unsure about style,
+   or live in a rented apartment that meets the rules.
+4. Never send an unqualified or rejected enquiry through the normal Calendly booking flow.
+5. Never silently treat missing critical information (project scope, location, timeline) as a pass.
+6. Do not autonomously resolve existing-project complaints.
+7. Do not let a weighted score override explicit exclusions or the qualification rules.
+8. Keep a record of the call disposition so the dashboard can report total demand and reasons for rejection.
+9. Before automatic rejection is launched, ask Nikhil to resolve the one-failure vs two-failure wording
+   ambiguity in qualified.md.
+10. Test with actual examples from the transcript set before production, including pricing questions,
+    out-of-area projects, advice-only requests, rushed timelines, low volunteered budgets, rented homes,
+    authorised representatives, missed follow-ups and complaints.
+
+END OF RUBRIC
