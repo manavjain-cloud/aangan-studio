@@ -36,7 +36,7 @@ const FACT_PARAMS: Record<string, string> = {
   site_condition: "bare_shell | new_possession_empty | occupied | under_construction | vacant_old",
   is_rented: "true | false",
   structural_changes_required: "true | false",
-  desired_completion_date: "YYYY-MM-DD, use today's date from get_call_context to resolve phrases like 'by March'",
+  desired_completion_date: "YYYY-MM-DD, use today (given in your instructions) to resolve phrases like 'by March'",
   timeline_flexible: "true if the caller says they have no fixed deadline",
   site_available_date: "YYYY-MM-DD when the site will be available",
   site_available_now: "true | false",
@@ -54,7 +54,6 @@ const FACT_PARAMS: Record<string, string> = {
 };
 
 const TOOLS: Tool[] = [
-  { name: "get_call_context", action: "get_call_context", when: "Call ONCE at the very start of the call, before asking anything. Returns today's date, whether it is after hours, and anything already known from an earlier dropped call.", params: {} },
   { name: "save_enquiry_progress", action: "save_enquiry_progress", when: "Call after the caller gives you any new facts (location, scope, timeline, authority...). Send ONLY facts the caller actually stated; leave everything else out. Never ask the caller for a budget.", params: FACT_PARAMS },
   { name: "evaluate_qualification", action: "evaluate_qualification", when: "Call when you have asked the basic questions, and again after each clarifying answer. Say exactly what `say` returns. Never decide qualification yourself.", params: FACT_PARAMS },
   { name: "get_available_slots", action: "get_available_slots", when: "ONLY after evaluate_qualification returns status 'qualified' and the caller has said when they are free. Offer only the times returned; never invent a time.", params: { date_from: "YYYY-MM-DD earliest day the caller can meet", date_to: "YYYY-MM-DD latest day", time_of_day: "morning | afternoon | evening | any" } },

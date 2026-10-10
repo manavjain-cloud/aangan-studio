@@ -14,7 +14,7 @@ import { sha256Hex } from "../security/hmac";
 import { DEFAULT_TZ, isAfterHours, isoDateInZone, zonedParts } from "../time";
 import { bookConsultation, getAvailableSlots, type SlotsOutcome, type TimeOfDay } from "./booking";
 import { createEscalation } from "./escalations";
-import { currentCallMode, ensureCallContext, ensureCallRef, findActiveCallByPhone, findCallByRef, findSoleActiveCall, normalizePhone, type CallContext } from "./ingest";
+import { currentCallMode, ensureCallContext, ensureCallRef, findActiveCallByPhone, findCallByRef, findSoleActiveCall, findOpenAdhocSession, normalizePhone, type CallContext } from "./ingest";
 import { enqueue } from "./outbox";
 import { evaluateAndPersist, saveFacts } from "./qualify";
 import { getQualificationConfig } from "./settings";
@@ -138,20 +138,33 @@ export async function handleToolRequest(db: Db, rawBody: unknown, meta: ToolRequ
       resolvedBy = "caller_phone";
     }
   }
+  let soleAmbiguous = false;
   if (!ctx && !vaaniCallId && !callRef && !phone) {
     const sole = await findSoleActiveCall(db, mode);
+    soleAmbiguous = sole.ambiguous;
     if (sole.call) {
       ctx = await ensureCallContext(db, { vaaniCallId: sole.call.vaaniCallId, fromNumber: sole.call.fromNumber, mode, businessHours: config.businessHours, source: "tool" });
       resolvedBy = "sole_active_call";
     }
   }
-  // A conversation that starts with get_call_context but has no call event (e.g. a browser test) gets its own session.
-  if (!ctx && action === "get_call_context" && !callRef) {
-    const id = `adhoc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
-    ctx = await ensureCallContext(db, { vaaniCallId: id, fromNumber: null, mode, businessHours: config.businessHours, source: "tool" });
-    // No call lifecycle events will ever arrive for it, so close it now (it must never look "in progress").
-    await db.update(calls).set({ endedAt: new Date(), answered: true, answeredAt: new Date() }).where(eq(calls.id, ctx.call.id));
-    resolvedBy = "adhoc_session";
+  // No call event for this conversation (a browser/chat test, or a webhook that has not arrived yet). Follow the latest
+  // ad-hoc session of the last 20 minutes unless it already reached an outcome; get_call_context always starts a new one.
+  const canStartSession = ["get_call_context", "save_enquiry_progress", "evaluate_qualification", "escalate_to_human"].includes(action);
+  if (!ctx && !soleAmbiguous && !vaaniCallId && !callRef && !phone) {
+    if (action !== "get_call_context") {
+      const recent = await findOpenAdhocSession(db, mode);
+      if (recent) {
+        ctx = await ensureCallContext(db, { vaaniCallId: recent.vaaniCallId, fromNumber: null, mode, businessHours: config.businessHours, source: "tool" });
+        resolvedBy = "adhoc_continued";
+      }
+    }
+    if (!ctx && canStartSession) {
+      const id = `adhoc-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
+      ctx = await ensureCallContext(db, { vaaniCallId: id, fromNumber: null, mode, businessHours: config.businessHours, source: "tool" });
+      // No call lifecycle events will ever arrive for it, so close it now (it must never look "in progress").
+      await db.update(calls).set({ endedAt: new Date(), answered: true, answeredAt: new Date() }).where(eq(calls.id, ctx.call.id));
+      resolvedBy = "adhoc_session";
+    }
   }
   if (ctx && resolvedBy !== "call_id") await logCallEvent(db, ctx.call.id, "call_resolved", { action, resolvedBy, callMode: sessionMode || null });
   if (!ctx) {
@@ -349,7 +362,7 @@ async function evaluate(db: Db, ctx: CallContext, data: Record<string, unknown>,
         say: pricing ? APPROVED_PRICING_RESPONSE : undefined,
         data: { ...pricingData, notes_for_agent: r.caveats.length ? "Some details are still unconfirmed; do not push the caller for them." : undefined },
         instruction:
-          "The enquiry qualifies. Tell the caller it sounds like a good fit, then ask when they are free for a consultation with one of the designers (days and rough times) and confirm their email address for the calendar invitation. Then call get_available_slots. Do not promise anything before the server confirms a booking.",
+          "The enquiry qualifies. Tell the caller it sounds like a good fit, then ask when they are free for a consultation with one of the designers (days and rough times) and confirm their email address for the calendar invitation. Then call aangan_find_slots. Do not promise anything before the server confirms a booking.",
       });
     case "clarification_required":
       return reply({
@@ -381,19 +394,19 @@ function slotsToReply(o: SlotsOutcome): ToolResult {
         ok: true, status: "slots_available", next_action: "offer_slots_and_get_confirmation",
         data: { slots: o.slots.map((s) => ({ option: s.option, spoken: s.spoken })), window_expanded: o.windowExpanded, timezone: o.timezone },
         say: `I can offer ${o.slots.map((s) => s.spoken).join(", or ")}. Which of these works best for you?`,
-        instruction: `${o.windowExpanded ? "Nothing matched the requested window, so these are the nearest alternatives; say so. " : ""}Read the options naturally (${list}). Only these times exist - never invent another. Wait for the caller to choose and clearly say yes, repeat the chosen time back, then call book_consultation with that option, customer_confirmed=true and the caller's own words in customer_confirmation_quote.`,
+        instruction: `${o.windowExpanded ? "Nothing matched the requested window, so these are the nearest alternatives; say so. " : ""}Read the options naturally (${list}). Only these times exist - never invent another. Wait for the caller to choose and clearly say yes, repeat the chosen time back, then call aangan_make_booking with that option, customer_confirmed=true and the caller's own words in customer_confirmation_quote.`,
       });
     }
     case "no_slots":
       return reply({
         ok: true, status: "no_slots", next_action: "ask_another_window",
         say: "I don't see an opening in that window. Could you suggest another day or time range that would suit you?",
-        instruction: "Ask for a different window, then call get_available_slots again. Do not invent availability.",
+        instruction: "Ask for a different window, then call aangan_find_slots again. Do not invent availability.",
       });
     case "not_bookable":
       return reply({
         ok: false, status: "not_bookable", next_action: "do_not_book", error: { code: "not_bookable", message: o.reason },
-        instruction: "This enquiry is not qualified for a consultation booking. Do not offer or promise one. Call evaluate_qualification if facts changed.",
+        instruction: "This enquiry is not qualified for a consultation booking. Do not offer or promise one. Call aangan_evaluate_lead if facts changed.",
       });
     case "no_designer":
       return reply({
@@ -456,13 +469,13 @@ async function book(db: Db, ctx: CallContext, data: Record<string, unknown>): Pr
         : "Which of the times I mentioned would you like?";
       return reply({
         ok: false, status: "needs_info", next_action: "ask_missing_detail", say, data: { missing: out.missing },
-        instruction: "Nothing has been booked. Collect the missing item, then call book_consultation again. For email, read it back letter by letter to confirm.",
+        instruction: "Nothing has been booked. Collect the missing item, then call aangan_make_booking again. For email, read it back letter by letter to confirm.",
       });
     }
     case "slot_expired":
       return reply({
         ok: false, status: "slot_expired", next_action: "call_get_available_slots",
-        instruction: "Those options have expired or were not offered. Call get_available_slots again before booking. Nothing has been booked.",
+        instruction: "Those options have expired or were not offered. Call aangan_find_slots again before booking. Nothing has been booked.",
       });
     case "slot_unavailable": {
       const alt = slotsToReply(out.alternatives);

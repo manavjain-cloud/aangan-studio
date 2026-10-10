@@ -1,4 +1,4 @@
-import { and, desc, eq, gte, isNull, like, ne, not, or } from "drizzle-orm";
+import { and, desc, eq, gte, isNull, like, ne, not, notInArray, or } from "drizzle-orm";
 import type { Db } from "../db/client";
 import { calls, contacts, enquiries, type DataMode } from "../db/schema";
 import type { QualificationConfig } from "../domain/config";
@@ -191,6 +191,28 @@ export async function findSoleActiveCall(db: Db, mode: DataMode): Promise<{ call
     .orderBy(desc(calls.receivedAt))
     .limit(3);
   return rows.length === 1 ? { call: rows[0]!, ambiguous: false } : { call: null, ambiguous: rows.length > 1 };
+}
+
+/**
+ * A conversation with no Vaani call event (browser/chat test, or a webhook that has not arrived): the newest ad-hoc session
+ * of the last 30 minutes that has not reached an outcome yet, so the tools of one conversation land on one enquiry.
+ */
+export async function findOpenAdhocSession(db: Db, mode: DataMode): Promise<CallRow | null> {
+  const since = new Date(Date.now() - 30 * 60_000);
+  const [row] = await db
+    .select()
+    .from(calls)
+    .where(
+      and(
+        eq(calls.mode, mode),
+        like(calls.vaaniCallId, "adhoc-%"),
+        gte(calls.receivedAt, since),
+        notInArray(calls.state, ["rejected", "human_escalation", "booking_confirmed", "booking_failed", "completed", "abandoned"]),
+      ),
+    )
+    .orderBy(desc(calls.receivedAt))
+    .limit(1);
+  return row ?? null;
 }
 
 const REF_ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"; // no 0/O/1/I/L: easy for a model to carry and echo

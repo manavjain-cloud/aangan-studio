@@ -135,7 +135,7 @@ describe("Vaani agent prompt (docs/vaani-agent-prompt.md)", () => {
 
   it("contains the approved pricing deflection verbatim (dash-insensitive) and every tool name", () => {
     expect(norm(prompt)).toContain(norm(APPROVED_PRICING_RESPONSE));
-    for (const t of ["aangan_get_call_context", "aangan_save_progress", "aangan_evaluate_lead", "aangan_find_slots", "aangan_make_booking", "aangan_escalate_to_human"]) expect(prompt).toContain(t);
+    for (const t of ["aangan_save_progress", "aangan_evaluate_lead", "aangan_find_slots", "aangan_make_booking", "aangan_escalate_to_human"]) expect(prompt).toContain(t);
   });
   it("contains no price, rate or budget figure", () => {
     expect(prompt).not.toMatch(/[₹$]\s*\d|\brs\.?\s*\d|\d[\d,.]*\s*(lakh|lac|crore)|\d[\d,]*\s*(per|\/)\s*sq/i);

@@ -146,7 +146,7 @@ describe("guardrails on the live endpoint", () => {
   });
 
   it("treats unresolved template placeholders in call_id as missing context", async () => {
-    const r = await h.tool("save_enquiry_progress", { caller_name: "X" }, "{{call_id}}");
+    const r = await h.tool("get_available_slots", {}, "{{call_id}}");
     expect(r.httpStatus).toBe(422);
     expect(r.body.status).toBe("missing_call_context");
   });
@@ -355,6 +355,30 @@ describe("call identity when Vaani passes none (call_ref, ad-hoc sessions, sessi
     const ev = await hh.tool("evaluate_qualification", { ...QUALIFYING_FACTS, call_ref: ref }, "");
     expect(ev.body.status).toBe("qualified");
     expect((await hh.db.select().from(calls))).toHaveLength(1);
+  });
+
+  it("without call_ref or call event, tools of one conversation follow the same ad-hoc session (no get_call_context needed); an outcome closes it", async () => {
+    const first = await hh.tool("save_enquiry_progress", { caller_name: "Chat Caller" }, "");
+    expect(first.body.ok).toBe(true);
+    const ev = await hh.tool("evaluate_qualification", { ...QUALIFYING_FACTS }, "");
+    expect(ev.body.status).toBe("qualified");
+    const slots = await hh.tool("get_available_slots", { date_from: "2026-10-13", date_to: "2026-10-14" }, "");
+    expect(slots.body.ok).toBe(true);
+    expect(await hh.db.select().from(calls)).toHaveLength(1);
+
+  });
+
+  it("an adhoc conversation that was rejected is finished: the next conversation starts its own session", async () => {
+    const rej = await hh.tool("evaluate_qualification", { ...QUALIFYING_FACTS, location_text: "Nashik" }, "");
+    expect(rej.body.status).toBe("rejected");
+    await hh.tool("save_enquiry_progress", { caller_name: "Next Caller" }, "");
+    expect(await hh.db.select().from(calls)).toHaveLength(2);
+  });
+
+  it("slots/booking never start a session on their own", async () => {
+    const r = await hh.tool("get_available_slots", { date_from: "2026-10-13" }, "");
+    expect(r.httpStatus).toBe(422);
+    expect(await hh.db.select().from(calls)).toHaveLength(0);
   });
 
   it("a real phone call (session mode 'phone') is not treated as a test", async () => {
