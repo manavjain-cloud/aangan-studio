@@ -1,9 +1,12 @@
 import Link from "next/link";
 import { BarList, FunnelChart, TrendChart } from "@/components/charts";
+import { HeroVideo } from "@/components/hero-video";
+import { WebCall } from "@/components/web-call";
 import { Filters, parseScope } from "@/components/filters";
 import { DispositionBadge, Empty, INTEGRATION_LABELS, ModeBadge, PageHeader, Section, Stat, StatusPill, fmtDuration, fmtInr, fmtMinutes, fmtPct } from "@/components/ui";
 import { requireViewer } from "@/lib/auth";
 import { getDb } from "@/lib/db/client";
+import { integrationStatus } from "@/lib/env";
 import { getOverview, resolveRange } from "@/lib/services/analytics";
 import { formatDateTimeInZone } from "@/lib/time";
 
@@ -26,6 +29,18 @@ export default async function OverviewPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
+      <section className="relative overflow-hidden rounded-[var(--radius-card,16px)] mb-10 text-white" aria-label="Aangan Studio">
+        <HeroVideo />
+        <div className="relative z-10 px-6 md:px-12 py-12 md:py-16 max-w-[820px]">
+          <p className="eyebrow fade-rise" style={{ color: "#e9dcc0" }}>Enquiry desk &middot; Pune</p>
+          <h2 className="display-hero mt-4 fade-rise">Every enquiry, answered with care.</h2>
+          <p className="lede mt-6 max-w-xl fade-rise-d2" style={{ color: "rgba(255,255,255,0.86)" }}>
+            See how many calls were answered, which leads were worth a designer&rsquo;s time, which consultations were booked &mdash; and what it all costs to run.
+          </p>
+          <WebCall available={integrationStatus("vaani").mode === "live"} />
+        </div>
+      </section>
+
       <PageHeader eyebrow="Management" title="Overview">
         {range.fromIso} to {range.toIso} (India time). Every figure below comes from persisted records; estimates are labelled as such.
       </PageHeader>
