@@ -2,8 +2,9 @@ import { redirect } from "next/navigation";
 import { signIn } from "@/app/actions/auth";
 import { HeroVideo } from "@/components/hero-video";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { WebCall } from "@/components/web-call";
 import { getSession } from "@/lib/auth";
-import { getEnv } from "@/lib/env";
+import { getEnv, integrationStatus } from "@/lib/env";
 
 export const dynamic = "force-dynamic";
 
@@ -37,6 +38,7 @@ export default async function EntryPage({ searchParams }: { searchParams: Promis
             See how many calls were answered, which leads were worth a designer&rsquo;s time, which consultations were booked &mdash; and what it all
             costs to run.
           </p>
+          <WebCall available={integrationStatus("vaani").mode === "live"} />
         </div>
 
         <form action={signIn} className="card p-6 md:p-7 fade-rise-d4 text-ink" style={{ background: "color-mix(in srgb, var(--surface) 94%, transparent)" }}>

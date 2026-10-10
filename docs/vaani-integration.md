@@ -90,3 +90,9 @@ the signed/tokenised `call_postprocessing` webhook (and a 15-minute fallback pol
 * Chat sessions cost credits (about Rs 0.5-1 each); the history page lists them as `chat_user -> chat_session`.
 * `GET /api/call-history` returns HTTP 500 on this workspace ("Invalid client_id format") and transcripts of chat rooms are not stored; webhooks are the reliable source.
 
+## 9. Channel: in-browser web call only (decision 2026-10-10)
+
+No telephone number is used. Callers start a voice call from the "Talk to the studio" button on the public entry page (`src/components/web-call.tsx`):
+the browser POSTs `/api/voice/web-session` (same-origin only, 4 per visitor per 10 min, `WEB_CALL_DAILY_CAP` per day), the server calls Vaani `POST /api/trigger-call/` with `medium: "webrtc"` (the API key never leaves the server) and returns a short-lived LiveKit token which the browser uses with `livekit-client` and the microphone.
+Vaani then fires the normal webhooks (the room name is the call id) and the agent uses the same tools, so qualification, booking, HubSpot, email and the dashboard behave exactly as for a phone call. Step 3 of the set-up list (telephony) is therefore not needed. The microphone/audio path itself can only be exercised by a person in a real browser; the session creation and everything after it are covered by tests and live checks.
+

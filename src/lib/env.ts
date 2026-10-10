@@ -32,6 +32,8 @@ const envSchema = z.object({
   VAANI_API_KEY: optional,
   VAANI_BASE_URL: z.string().url().default("https://api.vaanivoice.ai"),
   VAANI_AGENT_ID: optional,
+  /** Maximum public web calls started per 24 h (each costs Vaani credits). */
+  WEB_CALL_DAILY_CAP: optional,
   VAANI_WEBHOOK_SECRET: optional,
   VAANI_WEBHOOK_TOKEN: optional,
   VOICE_TOOL_SECRET: optional,

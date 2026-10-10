@@ -1,6 +1,6 @@
 import "server-only";
 import { HttpError, NetworkError, httpJson } from "../http";
-import { VaaniError, type VaaniCallDetails, type VaaniCallRecord, type VaaniClient } from "./types";
+import { VaaniError, type VaaniCallDetails, type VaaniCallRecord, type VaaniClient, type VaaniWebSession } from "./types";
 
 function mapError(err: unknown, what: string): VaaniError {
   if (err instanceof VaaniError) return err;
@@ -28,6 +28,23 @@ export class LiveVaaniClient implements VaaniClient {
       integration: "vaani", url: `${this.baseUrl}${path}`, query, headers: { "X-API-Key": this.apiKey },
       retries: 2, timeoutMs: 8_000, fetchImpl: this.fetchImpl,
     });
+  }
+
+  async createWebSession(input: { agentId: string }): Promise<VaaniWebSession> {
+    try {
+      const { data } = await httpJson<Record<string, unknown>>({
+        integration: "vaani", method: "POST", url: `${this.baseUrl}/api/trigger-call/`, headers: { "X-API-Key": this.apiKey },
+        body: { agent_id: input.agentId, medium: "webrtc", primary_language: "en", secondary_language: "hi" },
+        retries: 0, timeoutMs: 8_000, fetchImpl: this.fetchImpl,
+      });
+      const token = str(data.token);
+      const url = str(data.connection_url);
+      const room = str(data.room_name);
+      if (!token || !url || !room) throw new VaaniError("unknown", "web session response was missing token, connection_url or room_name");
+      return { token, url, room };
+    } catch (err) {
+      throw mapError(err, "create web session");
+    }
   }
 
   async getCallDetails(callId: string): Promise<VaaniCallDetails> {

@@ -1,4 +1,4 @@
-import type { VaaniCallDetails, VaaniCallRecord, VaaniClient } from "./types";
+import type { VaaniCallDetails, VaaniCallRecord, VaaniClient, VaaniWebSession } from "./types";
 
 interface MockVaaniState {
   details: Map<string, VaaniCallDetails>;
@@ -21,6 +21,9 @@ export class MockVaaniClient implements VaaniClient {
     state().history.push(r);
   }
 
+  async createWebSession(): Promise<VaaniWebSession> {
+    return { token: "mock-token", url: "wss://mock.invalid", room: `webrtc-mock-${Date.now().toString(36)}` };
+  }
   async getCallDetails(callId: string): Promise<VaaniCallDetails> {
     return state().details.get(callId) ?? { transcript: null, summary: null, entities: null, evalTag: null, ready: false };
   }

@@ -4,7 +4,7 @@ import { rateLimitCounters } from "../db/schema";
 
 /**
  * Fixed-window rate limiter backed by the database, so the limit holds across serverless instances.
- * One atomic upsert per check; stale windows are pruned opportunistically.
+ * One atomic upsert per check; windows older than 48 h (longer than any limit we use) are pruned opportunistically.
  */
 export async function checkRateLimit(
   db: Db,
@@ -28,7 +28,7 @@ export async function checkRateLimit(
   if (Math.random() < 0.02) {
     await db
       .delete(rateLimitCounters)
-      .where(and(lt(rateLimitCounters.windowStart, new Date(now.getTime() - 3600_000))))
+      .where(and(lt(rateLimitCounters.windowStart, new Date(now.getTime() - 48 * 3600_000))))
       .catch(() => undefined);
   }
   const retryAfterSec = Math.max(1, Math.ceil((windowStart.getTime() + windowMs - now.getTime()) / 1000));

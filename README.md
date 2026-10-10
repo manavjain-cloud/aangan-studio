@@ -81,7 +81,8 @@ Put values in `D:\Vaani Project\API_KEYS.txt`, then `npm run keys:sync`. **Never
 | `VOICE_TOOL_SECRET`, `VAANI_WEBHOOK_TOKEN` | generated for you in `API_KEYS.txt` | authenticates Vaani → our endpoints |
 | `VAANI_WEBHOOK_SECRET` | only if Vaani gives an HMAC secret for call webhooks | optional |
 | `GEMINI_API_KEY` | Google AI Studio (paid tier for production) | post-call extraction / audit |
-| `HUBSPOT_ACCESS_TOKEN` | Private App; scopes `crm.objects.contacts.read/write`, `crm.schemas.contacts.read/write` (+ deals scopes if `HUBSPOT_CREATE_DEALS=1`) | CRM |
+| `WEB_CALL_DAILY_CAP` | Optional; maximum public web calls started per 24 h (default 40; each costs Vaani credits) | Web call |
+| `HUBSPOT_ACCESS_TOKEN` | Service key (HubSpot has retired legacy private apps on new accounts: Development → Keys → Service Keys) or Private App; scopes `crm.objects.contacts.read/write`, `crm.schemas.contacts.read/write` (+ deals scopes if `HUBSPOT_CREATE_DEALS=1`) | CRM |
 | `CALCOM_API_KEY` (free) **or** `CALENDLY_ACCESS_TOKEN` (**paid** plan, Standard+) | Cal.com: Settings → Security → API keys. Calendly: Personal Access Token. One **event type per designer** pasted in *Settings → Team* (`calcom:<id>` or the Calendly URI). Set `CALENDAR_PROVIDER=calcom` or `calendly` (auto-detected) | availability + booking |
 | `RESEND_API_KEY`, `EMAIL_FROM` | Resend; **verified sending domain** | emails |
 | `FRONT_DESK_EMAIL`, `SENIOR_ESCALATION_EMAIL`, `OPS_ALERT_EMAIL` | recipients (or configure in *Settings → Team*) | routing |

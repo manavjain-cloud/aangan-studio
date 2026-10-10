@@ -35,8 +35,19 @@ export interface VaaniCallDetails {
   ready: boolean;
 }
 
+export interface VaaniWebSession {
+  /** Short-lived participant token for the LiveKit browser client. */
+  token: string;
+  /** LiveKit server URL (https or wss). */
+  url: string;
+  /** Room name; Vaani reports the same name as the call id in its webhooks. */
+  room: string;
+}
+
 export interface VaaniClient {
   readonly mode: "live" | "mock";
+  /** Starts an in-browser (WebRTC) call with the agent: no telephone number is involved. */
+  createWebSession(input: { agentId: string }): Promise<VaaniWebSession>;
   getCallDetails(callId: string): Promise<VaaniCallDetails>;
   getCallHistory(input: { page: number; pageSize: number }): Promise<{ records: VaaniCallRecord[]; hasNext: boolean }>;
   health(): Promise<{ ok: boolean; detail: string }>;
