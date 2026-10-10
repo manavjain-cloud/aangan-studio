@@ -102,9 +102,14 @@ describe("Vaani webhook ingestion", () => {
     expect(await h.db.select().from(calls)).toHaveLength(0);
   });
 
-  it("an invalid payload is rejected without touching data", async () => {
-    expect((await h.webhook({ nothing: true })).status).toBe("invalid");
-    expect((await h.webhook({ event: "call_started" })).status).toBe("invalid");
+  it("a connectivity test / unrecognised payload is acknowledged (no Vaani retry storm), logged, and creates no call", async () => {
+    expect((await h.webhook({ nothing: true })).status).toBe("ignored");
+    expect((await h.webhook({ event: "call_started" })).status).toBe("ignored");
+    expect((await h.webhook({ event: "webhook.test", message: "hello" })).status).toBe("ignored");
+    expect(await h.db.select().from(calls)).toHaveLength(0);
+    const logged = await h.db.select().from(integrationEvents);
+    expect(logged).toHaveLength(3);
+    expect(logged.every((e) => e.status === "rejected")).toBe(true);
   });
 
   it("a call with no webhook still works: the first tool call creates the call record", async () => {

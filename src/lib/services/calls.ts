@@ -65,17 +65,25 @@ const EARLY_STATES: CallState[] = [
 ];
 
 export async function handleVaaniEvent(db: Db, raw: unknown): Promise<WebhookResult> {
+  const mode = currentCallMode();
   const parsed = eventSchema.safeParse(raw);
-  if (!parsed.success) return { status: "invalid", error: parsed.error.issues[0]?.message ?? "bad payload" };
+  const callIdOf = (e: VaaniEvent) => e.call_id ?? e.data?.call_id ?? e.room_name ?? e.data?.room_name;
+  if (!parsed.success || !callIdOf(parsed.data)) {
+    // Connectivity tests and unrecognised payloads are acknowledged (so Vaani does not retry) but recorded for diagnosis.
+    await db.insert(integrationEvents).values({
+      integration: "vaani", direction: "inbound", eventType: parsed.success ? parsed.data.event : "unrecognised_payload", status: "rejected",
+      error: parsed.success ? "no call_id or room_name (connectivity test?)" : "payload did not match the expected event shape",
+      payload: redact(raw && typeof raw === "object" ? raw : { raw: String(raw).slice(0, 200) }) as Record<string, unknown>, mode,
+    });
+    return { status: "ignored", event: parsed.success ? parsed.data.event : "unrecognised", reason: "no usable call identifier" };
+  }
   const ev = parsed.data;
-  const vaaniCallId = ev.call_id ?? ev.data?.call_id ?? ev.room_name ?? ev.data?.room_name;
-  if (!vaaniCallId) return { status: "invalid", error: "no call_id or room_name" };
+  const vaaniCallId = callIdOf(ev)!;
 
   if (ev.direction && /outbound/i.test(ev.direction)) {
     return { status: "ignored", event: ev.event, reason: "outbound calls are out of scope for this build" };
   }
 
-  const mode = currentCallMode();
   const dedupeKey = `vaani:${ev.event}:${vaaniCallId}:${ev.timestamp ?? ev.transfer_type ?? ""}:${ev.reason ?? ""}`;
   const inserted = await db
     .insert(integrationEvents)

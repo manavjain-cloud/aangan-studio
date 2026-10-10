@@ -9,3 +9,6 @@ next-env.d.ts
 coverage
 _extracted
 secrets.local.txt
+
+.vercel
+.env*
