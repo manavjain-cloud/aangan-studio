@@ -178,7 +178,7 @@ async function applyEvent(db: Db, ctx: CallContext, ev: VaaniEvent): Promise<Web
       const d = ev.data ?? {};
       await db
         .update(calls)
-        .set({ durationMs: typeof d.call_duration === "number" ? Math.round(d.call_duration) : ctx.call.durationMs, endReason: d.end_reason ?? ctx.call.endReason, updatedAt: new Date() })
+        .set({ durationMs: typeof d.call_duration === "number" ? Math.round(d.call_duration * (/webrtc/i.test(d.call_type ?? "") ? 1000 : 1)) : ctx.call.durationMs, endReason: d.end_reason ?? ctx.call.endReason, updatedAt: new Date() })
         .where(eq(calls.id, callId));
       await storeTranscript(db, callId, transcriptText(d.transcript));
       await enqueue(db, { type: "postcall_enrich", key: `postcall:${callId}`, payload: { callId, vaaniSummaryPresent: !!d.summary }, maxAttempts: 6 });

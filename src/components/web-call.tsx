@@ -1,10 +1,11 @@
 "use client";
 
-import { Mic, MicOff, PhoneOff } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Volume2 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import type { Room } from "livekit-client";
 
 type Phase = "idle" | "connecting" | "live" | "ended" | "error";
+type Line = { id: string; who: "you" | "assistant"; text: string };
 
 const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
@@ -17,6 +18,9 @@ export function WebCall({ available }: { available: boolean }) {
   const [message, setMessage] = useState<string | null>(null);
   const [muted, setMuted] = useState(false);
   const [seconds, setSeconds] = useState(0);
+  const [lines, setLines] = useState<Line[]>([]);
+  const [speaking, setSpeaking] = useState<"you" | "assistant" | null>(null);
+  const [audioBlocked, setAudioBlocked] = useState(false);
   const roomRef = useRef<Room | null>(null);
   const audioHost = useRef<HTMLDivElement>(null);
 
@@ -33,6 +37,9 @@ export function WebCall({ available }: { available: boolean }) {
     setMessage(null);
     setMuted(false);
     setSeconds(0);
+    setLines([]);
+    setSpeaking(null);
+    setAudioBlocked(false);
     try {
       const res = await fetch("/api/voice/web-session", { method: "POST" });
       const body = (await res.json().catch(() => ({}))) as { ok?: boolean; token?: string; url?: string; message?: string };
@@ -48,12 +55,35 @@ export function WebCall({ available }: { available: boolean }) {
         if (track.kind === Track.Kind.Audio) audioHost.current?.appendChild(track.attach());
       });
       room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((el) => el.remove()));
+      room.on(RoomEvent.AudioPlaybackStatusChanged, () => setAudioBlocked(!room.canPlaybackAudio));
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        const local = speakers.some((p) => p.isLocal);
+        const remote = speakers.some((p) => !p.isLocal);
+        setSpeaking(remote ? "assistant" : local ? "you" : null);
+      });
+      // Live captions: the assistant's runtime streams what it heard and what it says on this topic.
+      room.registerTextStreamHandler("lk.transcription", async (reader, info) => {
+        try {
+          const text = (await reader.readAll()).trim();
+          if (!text) return;
+          const segment = reader.info.attributes?.["lk.segment_id"] ?? reader.info.id;
+          const mine = info.identity === room.localParticipant.identity;
+          setLines((prev) => {
+            const next = prev.filter((l) => l.id !== segment);
+            next.push({ id: segment, who: mine ? "you" : "assistant", text });
+            return next.slice(-6);
+          });
+        } catch {
+          /* captions are best-effort */
+        }
+      });
       room.on(RoomEvent.Disconnected, () => {
         roomRef.current = null;
         setPhase((p) => (p === "error" ? p : "ended"));
       });
       await room.connect(body.url, body.token);
       await room.startAudio().catch(() => undefined);
+      setAudioBlocked(!room.canPlaybackAudio);
       try {
         await room.localParticipant.setMicrophoneEnabled(true);
       } catch {
@@ -114,9 +144,29 @@ export function WebCall({ available }: { available: boolean }) {
         )}
       </div>
 
+      {phase === "live" && audioBlocked && (
+        <button type="button" className="btn btn-ghost btn-sm mt-3 !text-white !border-white/50" onClick={() => roomRef.current?.startAudio().then(() => setAudioBlocked(false))}>
+          <Volume2 size={14} aria-hidden /> Tap to hear the assistant
+        </button>
+      )}
+      {phase === "live" && (
+        <p className="text-[12px] mt-3" style={{ color: "rgba(255,255,255,0.75)" }} role="status">
+          {speaking === "assistant" ? "The assistant is speaking…" : speaking === "you" ? "Listening to you…" : muted ? "Your microphone is muted." : "Speak whenever you are ready."}
+        </p>
+      )}
+      {lines.length > 0 && (
+        <ul className="mt-3 space-y-1.5 text-[13px]" aria-label="Live captions" aria-live="polite">
+          {lines.map((l) => (
+            <li key={l.id} style={{ color: l.who === "you" ? "#e9dcc0" : "rgba(255,255,255,0.92)" }}>
+              <span className="uppercase tracking-wider text-[10px] opacity-70 mr-2">{l.who === "you" ? "You" : "Assistant"}</span>
+              {l.text}
+            </li>
+          ))}
+        </ul>
+      )}
       {phase === "ended" && <p className="text-[13px] mt-3" role="status">Call ended. Thank you &mdash; the studio will follow up by email if a consultation was arranged.</p>}
       {message && <p role="alert" className="badge badge-bad !h-auto !py-2 !whitespace-normal mt-3">{message}</p>}
-      <div ref={audioHost} aria-hidden className="hidden" />
+      <div ref={audioHost} aria-hidden style={{ position: "absolute", width: 1, height: 1, overflow: "hidden", opacity: 0, pointerEvents: "none" }} />
     </section>
   );
 }
