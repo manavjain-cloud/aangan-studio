@@ -22,6 +22,33 @@ export function WebCall({ available }: { available: boolean }) {
   const [speaking, setSpeaking] = useState<"you" | "assistant" | null>(null);
   const [audioBlocked, setAudioBlocked] = useState(false);
   const roomRef = useRef<Room | null>(null);
+  const diag = useRef<{ room: string; t0: number; buf: Array<{ t: number; e: string; d?: string }> }>({ room: "", t0: 0, buf: [] });
+
+  /** Records what this browser sees (never audio or speech content) so a failed call can be diagnosed. */
+  function note(e: string, d?: string) {
+    diag.current.buf.push({ t: Math.round(performance.now() - diag.current.t0), e, ...(d ? { d: d.slice(0, 180) } : {}) });
+    if (diag.current.buf.length >= 40) flush();
+  }
+  function flush() {
+    const { room, buf } = diag.current;
+    if (!room || buf.length === 0) return;
+    diag.current.buf = [];
+    try {
+      fetch("/api/voice/web-diag", { method: "POST", keepalive: true, headers: { "Content-Type": "application/json" }, body: JSON.stringify({ room, events: buf }) }).catch(() => undefined);
+    } catch {
+      /* diagnostics are best-effort */
+    }
+  }
+
+  useEffect(() => {
+    const onVis = () => note(`visibility:${document.visibilityState}`);
+    const onHide = () => { note("pagehide"); flush(); };
+    document.addEventListener("visibilitychange", onVis);
+    window.addEventListener("pagehide", onHide);
+    const t = setInterval(flush, 4000);
+    return () => { document.removeEventListener("visibilitychange", onVis); window.removeEventListener("pagehide", onHide); clearInterval(t); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const audioHost = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -30,7 +57,11 @@ export function WebCall({ available }: { available: boolean }) {
     return () => clearInterval(t);
   }, [phase]);
 
-  useEffect(() => () => void roomRef.current?.disconnect(), []);
+  useEffect(() => () => {
+    if (roomRef.current) { note("unmount_while_connected"); flush(); }
+    void roomRef.current?.disconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function start() {
     setPhase("connecting");
@@ -42,24 +73,31 @@ export function WebCall({ available }: { available: boolean }) {
     setAudioBlocked(false);
     try {
       const res = await fetch("/api/voice/web-session", { method: "POST" });
-      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; token?: string; url?: string; message?: string };
+      const body = (await res.json().catch(() => ({}))) as { ok?: boolean; token?: string; url?: string; room?: string; message?: string };
       if (!res.ok || !body.ok || !body.token || !body.url) {
         setPhase("error");
         setMessage(body.message ?? "The assistant could not be reached right now. Please try again in a moment.");
         return;
       }
-      const { Room, RoomEvent, Track } = await import("livekit-client");
+      diag.current = { room: String((body as { room?: string }).room ?? ""), t0: performance.now(), buf: [] };
+      note("session_created");
+      const { Room, RoomEvent, Track, DisconnectReason } = await import("livekit-client");
       const room = new Room({ adaptiveStream: true, dynacast: true });
       roomRef.current = room;
       room.on(RoomEvent.TrackSubscribed, (track) => {
-        if (track.kind === Track.Kind.Audio) audioHost.current?.appendChild(track.attach());
+        if (track.kind === Track.Kind.Audio) { audioHost.current?.appendChild(track.attach()); note("assistant_audio_subscribed"); }
       });
+      room.on(RoomEvent.ConnectionStateChanged, (st) => note(`connection:${st}`));
+      room.on(RoomEvent.ParticipantDisconnected, (p) => note("participant_left", p.identity));
+      room.on(RoomEvent.TrackMuted, (pub, p) => note("track_muted", `${p.isLocal ? "local" : "remote"}:${pub.kind}`));
+      room.on(RoomEvent.TrackUnsubscribed, () => note("assistant_track_unsubscribed"));
       room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach().forEach((el) => el.remove()));
       room.on(RoomEvent.AudioPlaybackStatusChanged, () => setAudioBlocked(!room.canPlaybackAudio));
       room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
         const local = speakers.some((p) => p.isLocal);
         const remote = speakers.some((p) => !p.isLocal);
         setSpeaking(remote ? "assistant" : local ? "you" : null);
+        note(`speakers:${remote ? "assistant" : ""}${local ? "+you" : ""}` || "speakers:none");
       });
       // Live captions: the assistant's runtime streams what it heard and what it says on this topic.
       room.registerTextStreamHandler("lk.transcription", async (reader, info) => {
@@ -77,7 +115,9 @@ export function WebCall({ available }: { available: boolean }) {
           /* captions are best-effort */
         }
       });
-      room.on(RoomEvent.Disconnected, () => {
+      room.on(RoomEvent.Disconnected, (reason) => {
+        note("disconnected", reason === undefined ? "unknown" : (DisconnectReason[reason] ?? String(reason)));
+        flush();
         roomRef.current = null;
         setPhase((p) => (p === "error" ? p : "ended"));
       });
@@ -92,8 +132,10 @@ export function WebCall({ available }: { available: boolean }) {
         setMessage("The microphone is blocked. Allow microphone access in your browser, then try again.");
         return;
       }
+      note("mic_on");
       setPhase("live");
-    } catch {
+    } catch (err) {
+      note("error", String((err as Error)?.message ?? err));
       roomRef.current?.disconnect();
       setPhase("error");
       setMessage("The call could not be connected. Please check your connection and try again.");
@@ -137,7 +179,7 @@ export function WebCall({ available }: { available: boolean }) {
             <button type="button" className="btn btn-ghost !text-white !border-white/50" onClick={toggleMute} aria-pressed={muted}>
               {muted ? <MicOff size={16} aria-hidden /> : <Mic size={16} aria-hidden />} {muted ? "Unmute" : "Mute"}
             </button>
-            <button type="button" className="btn btn-danger" onClick={() => roomRef.current?.disconnect()}>
+            <button type="button" className="btn btn-danger" onClick={() => { note("user_clicked_end"); roomRef.current?.disconnect(); }}>
               <PhoneOff size={16} aria-hidden /> End call
             </button>
           </>
