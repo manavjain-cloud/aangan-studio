@@ -20,35 +20,35 @@ const log = createLogger("vaani-webhook");
 const eventSchema = z
   .object({
     event: z.string(),
-    room_name: z.string().optional(),
-    call_id: z.string().optional(),
-    status: z.string().optional(),
-    phone_number: z.string().optional(),
-    from_number: z.string().optional(),
-    to_number: z.string().optional(),
-    direction: z.string().optional(),
-    agent_id: z.string().optional(),
-    timestamp: z.string().optional(),
-    call_duration: z.number().optional(),
-    end_reason: z.string().optional(),
-    transfer_type: z.string().optional(),
-    reason: z.string().optional(),
+    room_name: z.string().nullish(),
+    call_id: z.string().nullish(),
+    status: z.string().nullish(),
+    phone_number: z.string().nullish(),
+    from_number: z.string().nullish(),
+    to_number: z.string().nullish(),
+    direction: z.string().nullish(),
+    agent_id: z.string().nullish(),
+    timestamp: z.string().nullish(),
+    call_duration: z.number().nullish(),
+    end_reason: z.string().nullish(),
+    transfer_type: z.string().nullish(),
+    reason: z.string().nullish(),
     data: z
       .object({
-        room_name: z.string().optional(),
-        call_id: z.string().optional(),
-        call_duration: z.number().optional(),
-        end_reason: z.string().optional(),
+        room_name: z.string().nullish(),
+        call_id: z.string().nullish(),
+        call_duration: z.number().nullish(),
+        end_reason: z.string().nullish(),
         summary: z.string().nullable().optional(),
-        transcript: z.string().nullable().optional(),
+        transcript: z.unknown().optional(),
         entities: z.record(z.string(), z.unknown()).nullable().optional(),
         dispositions: z.record(z.string(), z.unknown()).nullable().optional(),
-        from_number: z.string().optional(),
-        phone_number: z.string().optional(),
-        call_type: z.string().optional(),
-        picked_up_at: z.string().optional(),
-        reason: z.string().optional(),
-        transfer_type: z.string().optional(),
+        from_number: z.string().nullish(),
+        phone_number: z.string().nullish(),
+        call_type: z.string().nullish(),
+        picked_up_at: z.string().nullish(),
+        reason: z.string().nullish(),
+        transfer_type: z.string().nullish(),
       })
       .passthrough()
       .optional(),
@@ -67,6 +67,23 @@ const EARLY_STATES: CallState[] = [
   "call_received", "agent_active", "capturing_information", "clarification_required", "asking_availability",
   "checking_calendar", "awaiting_customer_confirmation", "booking_calendar",
 ];
+
+/** Vaani sends the transcript as text, but be tolerant of a list of turns or an object. */
+function transcriptText(t: unknown): string | null {
+  if (typeof t === "string") return t;
+  if (t === null || t === undefined) return null;
+  if (Array.isArray(t)) {
+    return t
+      .map((x) => (typeof x === "string" ? x : x && typeof x === "object" ? `${String((x as Record<string, unknown>).role ?? (x as Record<string, unknown>).speaker ?? "").toUpperCase()}: ${String((x as Record<string, unknown>).text ?? (x as Record<string, unknown>).content ?? "")}`.trim() : ""))
+      .filter(Boolean)
+      .join("\n");
+  }
+  try {
+    return JSON.stringify(t);
+  } catch {
+    return null;
+  }
+}
 
 export async function handleVaaniEvent(db: Db, raw: unknown): Promise<WebhookResult> {
   const mode = currentCallMode();
@@ -140,7 +157,7 @@ async function applyEvent(db: Db, ctx: CallContext, ev: VaaniEvent): Promise<Web
     }
     case "call_ended": {
       const seconds = ev.call_duration ?? ev.data?.call_duration; // seconds in this event; Vaani nests it under data
-      const durationMs = seconds !== undefined ? Math.round(seconds * 1000) : null;
+      const durationMs = typeof seconds === "number" ? Math.round(seconds * 1000) : null;
       const endReason = ev.end_reason ?? ev.data?.end_reason ?? null;
       const answered = ctx.call.answered || (durationMs !== null && durationMs >= 5_000);
       await db.update(calls).set({ endedAt: eventTime(ev), durationMs, endReason, answered, updatedAt: new Date() }).where(eq(calls.id, callId));
@@ -161,9 +178,9 @@ async function applyEvent(db: Db, ctx: CallContext, ev: VaaniEvent): Promise<Web
       const d = ev.data ?? {};
       await db
         .update(calls)
-        .set({ durationMs: d.call_duration !== undefined ? Math.round(d.call_duration) : ctx.call.durationMs, endReason: d.end_reason ?? ctx.call.endReason, updatedAt: new Date() })
+        .set({ durationMs: typeof d.call_duration === "number" ? Math.round(d.call_duration) : ctx.call.durationMs, endReason: d.end_reason ?? ctx.call.endReason, updatedAt: new Date() })
         .where(eq(calls.id, callId));
-      await storeTranscript(db, callId, d.transcript ?? null);
+      await storeTranscript(db, callId, transcriptText(d.transcript));
       await enqueue(db, { type: "postcall_enrich", key: `postcall:${callId}`, payload: { callId, vaaniSummaryPresent: !!d.summary }, maxAttempts: 6 });
       return { status: "processed", event: ev.event, callId };
     }
